@@ -5,23 +5,92 @@ import { GraduationCap, Mail, Lock, User, BookOpen } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import type { Role } from '@/types';
-
+import { signIn, signUp } from "@/service/auth";
+import { supabase } from "@/lib/supabase";
 export default function LoginScreen() {
   const navigate = useNavigate();
-  const [role, setRole] = useState<Role>('student');
-  const [isLogin, setIsLogin] = useState(true);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+const [role, setRole] = useState<Role>('student');
+const [isLogin, setIsLogin] = useState(true);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (role === 'teacher') {
-      navigate('/teacher/dashboard');
+const [name, setName] = useState('');
+const [email, setEmail] = useState('');
+const [password, setPassword] = useState('');
+
+// Signup fields
+const [registerNumber, setRegisterNumber] = useState('');
+const [college, setCollege] = useState('');
+const [department, setDepartment] = useState('');
+const [semester, setSemester] = useState('');
+
+// UI states
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState('');
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  setLoading(true);
+  setError("");
+
+  try {
+    if (isLogin) {
+      // Login
+      const { data, error } = await signIn(email, password);
+
+      if (error) throw error;
+
+      const user = data.user;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profile?.role === "teacher") {
+        navigate("/teacher/dashboard");
+      } else {
+        navigate("/home");
+      }
+
     } else {
-      navigate('/home');
+
+      // Signup
+      const { data, error } = await signUp({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      const user = data.user;
+
+      if (!user) {
+        throw new Error("User not created");
+      }
+
+      await supabase.from("profiles").insert({
+        id: user.id,
+        full_name: name,
+        role: role,
+        register_number: registerNumber,
+        college: college,
+        department: department,
+        semester: semester === "" ? null : Number(semester),
+      });
+
+      if (role === "teacher") {
+        navigate("/teacher/dashboard");
+      } else {
+        navigate("/home");
+      }
     }
-  };
+
+  } catch (err: any) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -71,18 +140,54 @@ export default function LoginScreen() {
             {isLogin ? 'Sign in to continue your learning' : 'Sign up to start your journey'}
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <Input
-                label="Full Name"
-                placeholder="Enter your name"
-                icon={<User size={18} />}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            )}
-            <Input
-              label="Email"
+    <form onSubmit={handleSubmit} className="space-y-4">
+  {!isLogin && (
+    <>
+      <Input
+        label="Full Name"
+        placeholder="Enter your name"
+        icon={<User size={18} />}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+
+      {role === "student" && (
+        <>
+          <Input
+            label="Register Number"
+            placeholder="Enter Register Number"
+            value={registerNumber}
+            onChange={(e) => setRegisterNumber(e.target.value)}
+          />
+
+          <Input
+            label="Department"
+            placeholder="Information Technology"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+          />
+
+          <Input
+            label="Semester"
+            placeholder="5"
+            value={semester}
+            onChange={(e) => setSemester(e.target.value)}
+          />
+        </>
+      )}
+
+      <Input
+        label="College"
+        placeholder="College Name"
+        value={college}
+        onChange={(e) => setCollege(e.target.value)}
+      />
+    </>
+  )}
+
+  <Input
+    label="Email"
+  
               type="email"
               placeholder="you@annauniv.edu.in"
               icon={<Mail size={18} />}
@@ -104,8 +209,23 @@ export default function LoginScreen() {
                 </button>
               </div>
             )}
-            <Button fullWidth size="lg" type="submit">
-              {isLogin ? 'Sign In' : 'Sign Up'}
+         {error && (
+  <p className="text-red-500 text-sm">
+    {error}
+  </p>
+)}
+
+<Button
+  fullWidth
+  size="lg"
+  type="submit"
+  disabled={loading}
+>
+            {loading
+  ? "Please wait..."
+  : isLogin
+  ? "Sign In"
+  : "Sign Up"}
             </Button>
           </form>
 

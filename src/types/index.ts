@@ -23,6 +23,7 @@ export interface Subject {
   icon: string;
   progress: number;
   units: Unit[];
+  isArrear?: boolean;
 }
 
 export interface Pdf {

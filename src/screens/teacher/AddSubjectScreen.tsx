@@ -6,20 +6,47 @@ import AppHeader from '@/components/layout/AppHeader';
 import TeacherBottomNav from '@/components/layout/TeacherBottomNav';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
+import { supabase } from '@/lib/supabase';
 
 export default function AddSubjectScreen() {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [credits, setCredits] = useState('');
   const [description, setDescription] = useState('');
-  const [semester, setSemester] = useState('');
+const [semester, setSemester] = useState('');
+const [department, setDepartment] = useState('');
   const [added, setAdded] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  const { error } = await supabase.from("subjects").insert([
+    {
+      subject_name: name,
+      subject_code: code,
+      semester: Number(semester),
+      department,
+      credits: Number(credits),
+      description,
+    },
+  ]);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  setAdded(true);
+
+  setName("");
+  setCode("");
+  setCredits("");
+  setDepartment("");
+  setSemester("");
+  setDescription("");
+
+  setTimeout(() => setAdded(false), 2000);
+};
 
   return (
     <>
@@ -58,6 +85,12 @@ export default function AddSubjectScreen() {
                   </select>
                 </div>
               </div>
+              <Input
+  label="Department"
+  placeholder="e.g., IT"
+  value={department}
+  onChange={(e) => setDepartment(e.target.value)}
+/>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
                 <textarea

@@ -12,31 +12,41 @@ import Badge from '@/components/ui/Badge';
 import { subjects } from '@/data/subjects';
 
 const menuSections = [
-  {
-    title: 'Learning',
-    items: [
-      { icon: GraduationCap, label: 'My Subjects', color: 'text-blue-600', bg: 'bg-blue-50' },
-      { icon: Bookmark, label: 'Bookmarks', color: 'text-amber-600', bg: 'bg-amber-50' },
-      { icon: Download, label: 'Downloads', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-      { icon: BrainCircuit, label: 'AI Assistant', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    ],
-  },
-  {
-    title: 'Preferences',
-    items: [
-      { icon: Bell, label: 'Notifications', color: 'text-red-600', bg: 'bg-red-50' },
-      { icon: Moon, label: 'Appearance', color: 'text-violet-600', bg: 'bg-violet-50' },
-      { icon: Globe, label: 'Language', color: 'text-cyan-600', bg: 'bg-cyan-50' },
-    ],
-  },
-  {
-    title: 'Support',
-    items: [
-      { icon: HelpCircle, label: 'Help & FAQ', color: 'text-blue-600', bg: 'bg-blue-50' },
-      { icon: Shield, label: 'Privacy & Security', color: 'text-gray-600', bg: 'bg-gray-100' },
-      { icon: Settings, label: 'Settings', color: 'text-gray-600', bg: 'bg-gray-100' },
-    ],
-  },
+{
+  title: 'Learning',
+  items: [
+    {
+      icon: GraduationCap,
+      label: 'My Subjects',
+      color: 'text-blue-600',
+      bg: 'bg-blue-50'
+    },
+    {
+      icon: GraduationCap,
+      label: 'Arrear Subjects',
+      color: 'text-red-600',
+      bg: 'bg-red-50'
+    },
+    {
+      icon: Bookmark,
+      label: 'Bookmarks',
+      color: 'text-amber-600',
+      bg: 'bg-amber-50'
+    },
+    {
+      icon: Download,
+      label: 'Downloads',
+      color: 'text-emerald-600',
+      bg: 'bg-emerald-50'
+    },
+    {
+      icon: BrainCircuit,
+      label: 'AI Assistant',
+      color: 'text-indigo-600',
+      bg: 'bg-indigo-50'
+    },
+  ],
+},
 ];
 
 export default function ProfileScreen() {
@@ -97,11 +107,20 @@ export default function ProfileScreen() {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: sIdx * 0.05 + i * 0.03 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => {
-                        if (item.label === 'My Subjects') navigate('/semester/5');
-                        else if (item.label === 'Bookmarks') navigate('/bookmarks');
-                        else if (item.label === 'AI Assistant') navigate('/ai-assistant');
-                      }}
+                     onClick={() => {
+  if (item.label === 'My Subjects') {
+    navigate('/semester/5');
+  } 
+  else if (item.label === 'Arrear Subjects') {
+    navigate('/arrear-subjects');
+  } 
+  else if (item.label === 'Bookmarks') {
+    navigate('/bookmarks');
+  } 
+  else if (item.label === 'AI Assistant') {
+    navigate('/ai-assistant');
+  }
+}}
                       className={`w-full flex items-center gap-3 p-3.5 hover:bg-gray-50 transition-colors ${i !== section.items.length - 1 ? 'border-b border-gray-50' : ''}`}
                     >
                       <div className={`w-9 h-9 rounded-xl ${item.bg} flex items-center justify-center flex-shrink-0`}>
