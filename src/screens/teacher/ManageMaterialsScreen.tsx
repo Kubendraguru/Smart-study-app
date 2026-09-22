@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FileText, Video, BookOpen, MoreVertical, Trash2, Edit2 } from 'lucide-react';
+import { FileText, Video, BookOpen, MoreVertical, Trash2, Edit2, Eye } from 'lucide-react';
 import PageContainer from '@/components/layout/PageContainer';
 import AppHeader from '@/components/layout/AppHeader';
 import TeacherBottomNav from '@/components/layout/TeacherBottomNav';
@@ -10,6 +11,7 @@ import { subjects } from '@/data/subjects';
 type Tab = 'pdfs' | 'videos' | 'units';
 
 export default function ManageMaterialsScreen() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('pdfs');
 
   const allPdfs: { title: string; subject: string; size: string; id: string }[] = [];
@@ -65,6 +67,13 @@ export default function ManageMaterialsScreen() {
                       <h3 className="font-semibold text-gray-900 text-sm truncate">{pdf.title}</h3>
                       <p className="text-xs text-gray-500">{pdf.subject} · {pdf.size}</p>
                     </div>
+                    <button
+                      onClick={() => navigate(`/teacher/tracking?pdfId=${pdf.id}`)}
+                      className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                      title="View Student Tracking"
+                    >
+                      <Eye size={16} />
+                    </button>
                     <button className="p-2 rounded-lg text-gray-400 hover:bg-gray-50">
                       <Edit2 size={16} />
                     </button>

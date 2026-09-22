@@ -34,6 +34,7 @@ export interface Pdf {
   uploadedBy: string;
   uploadedAt: string;
   url: string;
+  file_url?: string;
   bookmarked: boolean;
 }
 
@@ -70,4 +71,27 @@ export interface SemesterData {
   id: number;
   name: string;
   subjects: Subject[];
+}
+
+export interface StudentViewRecord {
+  studentId: string;
+  studentName: string;
+  registerNumber: string;
+  department?: string;
+  semester?: number;
+  viewed: boolean;
+  viewedAt?: string;
+}
+
+export interface PdfTrackingStats {
+  pdfId: string;
+  pdfTitle: string;
+  subjectName: string;
+  unitTitle: string;
+  totalStudents: number;
+  viewedCount: number;
+  notViewedCount: number;
+  viewedPercentage: number;
+  viewedStudents: StudentViewRecord[];
+  notViewedStudents: StudentViewRecord[];
 }

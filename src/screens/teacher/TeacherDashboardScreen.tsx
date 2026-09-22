@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText, Video, BookOpen, Bell, Upload, ClipboardList,
-  Users, TrendingUp, Plus, Link2,
+  Users, TrendingUp, Plus, Link2, Eye,
 } from 'lucide-react';
 import PageContainer from '@/components/layout/PageContainer';
 import AppHeader from '@/components/layout/AppHeader';
@@ -12,6 +12,7 @@ import { announcements } from '@/data/announcements';
 
 const quickActions = [
   { label: 'Upload PDF', icon: FileText, path: '/teacher/upload-pdf', color: 'text-red-500', bg: 'bg-red-50' },
+  { label: 'View Tracking', icon: Eye, path: '/teacher/tracking', color: 'text-indigo-500', bg: 'bg-indigo-50' },
   { label: 'Upload Notes', icon: BookOpen, path: '/teacher/upload-notes', color: 'text-blue-500', bg: 'bg-blue-50' },
   { label: 'Add Subject', icon: Plus, path: '/teacher/add-subject', color: 'text-emerald-500', bg: 'bg-emerald-50' },
   { label: 'Add Unit', icon: BookOpen, path: '/teacher/add-unit', color: 'text-amber-500', bg: 'bg-amber-50' },

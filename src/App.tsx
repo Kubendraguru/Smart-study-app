@@ -24,6 +24,7 @@ import TeacherAnnouncementsScreen from '@/screens/teacher/TeacherAnnouncementsSc
 import ManageMaterialsScreen from '@/screens/teacher/ManageMaterialsScreen';
 import ArrearSubjectsScreen from '@/screens/student/ArrearSubjectsScreen';
 import AddPdfScreen from '@/screens/teacher/AddPdfScreen';
+import PdfTrackingScreen from '@/screens/teacher/PdfTrackingScreen';
 
 
 export default function App() {
@@ -93,9 +94,25 @@ export default function App() {
         <Route path="/teacher/announcements" element={<TeacherAnnouncementsScreen />} />
         <Route path="/teacher/manage-materials" element={<ManageMaterialsScreen />} />
         <Route
-  path="/teacher/add-pdf"
-  element={<AddPdfScreen />}
-/>
+          path="/teacher/add-pdf"
+          element={<AddPdfScreen />}
+        />
+        <Route
+          path="/teacher/tracking"
+          element={
+            <ProtectedRoute role="teacher">
+              <PdfTrackingScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/tracking/:pdfId"
+          element={
+            <ProtectedRoute role="teacher">
+              <PdfTrackingScreen />
+            </ProtectedRoute>
+          }
+        />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

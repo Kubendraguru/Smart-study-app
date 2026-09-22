@@ -164,14 +164,48 @@ export default function SubjectDetailsScreen() {
       // 3. Format subject
       // ----------------------------------------
       const { data: unitData, error: unitError } = await supabase
-  .from('units')
-  .select('*')
-  .eq('subject_id', subjectId)
-  .order('unit_number', { ascending: true });
+        .from('units')
+        .select('*')
+        .eq('subject_id', subjectId)
+        .order('unit_number', { ascending: true });
 
-if (unitError) {
-  console.error('Error loading units:', unitError);
-}
+      if (unitError) {
+        console.error('Error loading units:', unitError);
+      }
+
+      const unitIds = (unitData ?? []).map((u: any) => u.id);
+      let materialsByUnit: Record<string, any[]> = {};
+
+      if (unitIds.length > 0) {
+        const { data: mats, error: matErr } = await supabase
+          .from('materials')
+          .select('*')
+          .in('unit_id', unitIds)
+          .or('material_type.ilike.pdf,file_url.ilike.%.pdf')
+          .order('created_at', { ascending: false });
+
+        if (matErr) {
+          console.error('Error loading materials for subject units:', matErr);
+        } else if (mats) {
+          mats.forEach((m: any) => {
+            if (!materialsByUnit[m.unit_id]) {
+              materialsByUnit[m.unit_id] = [];
+            }
+            materialsByUnit[m.unit_id].push({
+              id: m.id,
+              title: m.title || 'PDF Material',
+              size: 'PDF',
+              pages: 1,
+              uploadedBy: 'Instructor',
+              uploadedAt: m.created_at ? new Date(m.created_at).toLocaleDateString() : '',
+              url: m.file_url,
+              file_url: m.file_url,
+              bookmarked: false,
+            });
+          });
+        }
+      }
+
       const formattedSubject: Subject = {
         id: dbSubject.id,
         code: dbSubject.subject_code,
@@ -182,17 +216,17 @@ if (unitError) {
         color: isArrear ? 'rose' : 'blue',
         icon: 'book-open',
         progress: 0,
-       units: (unitData ?? []).map((unit: any) => ({
-  id: unit.id,
-  number: unit.unit_number,
-  title: unit.title,
-  description: unit.description ?? '',
-  pdfs: [],
-  videos: [],
-  importantQuestions: [],
-  assignments: [],
-  completed: false,
-})), 
+        units: (unitData ?? []).map((unit: any) => ({
+          id: unit.id,
+          number: unit.unit_number,
+          title: unit.unit_title ?? unit.title ?? `Unit ${unit.unit_number}`,
+          description: unit.description ?? '',
+          pdfs: materialsByUnit[unit.id] ?? [],
+          videos: [],
+          importantQuestions: [],
+          assignments: [],
+          completed: false,
+        })),
         isArrear,
       };
 

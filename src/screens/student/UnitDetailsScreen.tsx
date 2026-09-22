@@ -56,7 +56,6 @@ export default function UnitDetailsScreen() {
         .from('units')
         .select('*')
         .eq('id', unitId)
-        .eq('subject_id', subjectId)
         .single();
 
       if (error) {
@@ -70,16 +69,38 @@ export default function UnitDetailsScreen() {
         return;
       }
 
+      const { data: materialsData, error: materialsError } = await supabase
+        .from('materials')
+        .select('*')
+        .eq('unit_id', unitId)
+        .or('material_type.ilike.pdf,file_url.ilike.%.pdf')
+        .order('created_at', { ascending: false });
+
+      if (materialsError) {
+        console.error('Error loading materials:', materialsError);
+      }
+
+      const formattedPdfs = (materialsData ?? []).map((m: any) => ({
+        id: m.id,
+        title: m.title,
+        size: 'PDF',
+        pages: 1,
+        uploadedBy: 'Instructor',
+        uploadedAt: m.created_at ? new Date(m.created_at).toLocaleDateString() : '',
+        url: m.file_url,
+        file_url: m.file_url,
+        bookmarked: false,
+      }));
+
       setUnit({
         id: data.id,
         subject_id: data.subject_id,
         unit_number: data.unit_number,
-        title: data.title,
+        title: data.unit_title ?? data.title ?? `Unit ${data.unit_number}`,
         description: data.description ?? '',
         completed: data.completed ?? false,
 
-        // These will be connected to Supabase later
-        pdfs: [],
+        pdfs: formattedPdfs,
         videos: [],
         importantQuestions: [],
         assignments: [],
@@ -286,7 +307,9 @@ export default function UnitDetailsScreen() {
                       pdf={pdf}
                       index={i}
                       onClick={() =>
-                        navigate(`/pdf/${pdf.id}`)
+                        navigate(`/pdf/${pdf.id}`, {
+                          state: { pdf, subjectName: unit.title },
+                        })
                       }
                     />
                   ))

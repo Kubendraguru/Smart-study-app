@@ -4,6 +4,39 @@ import type { Pdf } from '@/types';
 import IconButton from '@/components/ui/IconButton';
 
 export default function PdfCard({ pdf, index = 0, onClick }: { pdf: Pdf; index?: number; onClick?: () => void }) {
+  const fileUrl = pdf.file_url || pdf.url || '';
+
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!fileUrl) return;
+    const a = document.createElement('a');
+    a.href = fileUrl;
+    a.download = pdf.title || 'document.pdf';
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!fileUrl) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: pdf.title,
+          url: fileUrl,
+        });
+      } catch {
+        // Ignored or cancelled by user
+      }
+    } else {
+      navigator.clipboard?.writeText(fileUrl);
+      alert('PDF link copied to clipboard!');
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -19,11 +52,11 @@ export default function PdfCard({ pdf, index = 0, onClick }: { pdf: Pdf; index?:
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2">{pdf.title}</h3>
             <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-              <span>{pdf.size}</span>
+              <span>{pdf.size || 'PDF'}</span>
               <span>·</span>
-              <span>{pdf.pages} pages</span>
+              <span>{pdf.pages ? `${pdf.pages} pages` : 'Document'}</span>
             </div>
-            <p className="text-xs text-gray-400 mt-1">By {pdf.uploadedBy}</p>
+            <p className="text-xs text-gray-400 mt-1">By {pdf.uploadedBy || 'Instructor'}</p>
           </div>
         </button>
       </div>
@@ -31,10 +64,10 @@ export default function PdfCard({ pdf, index = 0, onClick }: { pdf: Pdf; index?:
         <IconButton variant={pdf.bookmarked ? 'active' : 'ghost'} className="flex-1 justify-center">
           <Bookmark size={16} className={pdf.bookmarked ? 'fill-blue-500' : ''} />
         </IconButton>
-        <IconButton variant="ghost" className="flex-1 justify-center">
+        <IconButton variant="ghost" className="flex-1 justify-center" onClick={handleDownload} title="Download PDF">
           <Download size={16} />
         </IconButton>
-        <IconButton variant="ghost" className="flex-1 justify-center">
+        <IconButton variant="ghost" className="flex-1 justify-center" onClick={handleShare} title="Share PDF">
           <Share2 size={16} />
         </IconButton>
       </div>
