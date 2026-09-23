@@ -36,6 +36,8 @@ import { getVideos, getYoutubeThumbnail } from '@/service/videos';
 import { getAssignments } from '@/service/assignments';
 import { getBooks } from '@/service/books';
 import { isUnitCompleted, toggleUnitCompletion } from '@/service/progress';
+import { useArrearMotivation } from '@/hooks/useArrearMotivation';
+import ArrearMotivationToast from '@/components/mobile/ArrearMotivationToast';
 import type { Video, Book, Assignment } from '@/types';
 
 type PdfItem = {
@@ -57,6 +59,13 @@ export default function UnitDetailsScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('pdfs');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Arrear motivation for unit study
+  const { isToastVisible, currentMessage, dismissToast } = useArrearMotivation({
+    subjectId,
+    isStudyActive: !loading,
+  });
+
   const [isCompleted, setIsCompleted] = useState(false);
   const [togglingCompletion, setTogglingCompletion] = useState(false);
   const [pdfs, setPdfs] = useState<PdfItem[]>([]);
@@ -302,6 +311,7 @@ export default function UnitDetailsScreen() {
                           title: pdf.title,
                           fileUrl: pdf.file_url,
                           subjectName,
+                          subjectId,
                         })
                       }
                       activeOpacity={0.7}
@@ -521,9 +531,17 @@ export default function UnitDetailsScreen() {
           </>
         )}
       </ScrollView>
+
+      <ArrearMotivationToast
+        visible={isToastVisible}
+        message={currentMessage}
+        onDismiss={dismissToast}
+        position="bottom"
+      />
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   safeArea: {

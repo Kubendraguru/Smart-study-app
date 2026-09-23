@@ -21,17 +21,43 @@ import { theme } from '@/theme';
 import AppHeader from '@/components/mobile/AppHeader';
 import { useAuth } from '@/context/AuthContext';
 import { recordPdfView } from '@/service/tracking';
+import { supabase } from '@/lib/supabase';
+import { useArrearMotivation } from '@/hooks/useArrearMotivation';
+import ArrearMotivationToast from '@/components/mobile/ArrearMotivationToast';
 
 export default function PdfViewerScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const { user, role } = useAuth();
 
-  const { pdfId, title, fileUrl, subjectName } = route.params || {};
+  const { pdfId, title, fileUrl, subjectName, subjectId } = route.params || {};
 
+  const [resolvedSubjectId, setResolvedSubjectId] = useState<string | undefined>(subjectId);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [viewRecorded, setViewRecorded] = useState(false);
+
+  // Resolve subjectId from pdfId if not explicitly passed
+  useEffect(() => {
+    if (!resolvedSubjectId && pdfId) {
+      supabase
+        .from('materials')
+        .select('units(subject_id)')
+        .eq('id', pdfId)
+        .single()
+        .then(({ data }) => {
+          const sId = (data?.units as any)?.subject_id;
+          if (sId) setResolvedSubjectId(sId);
+        })
+        .catch(() => {});
+    }
+  }, [pdfId, resolvedSubjectId]);
+
+  // Arrear study motivation during PDF reading
+  const { isToastVisible, currentMessage, dismissToast } = useArrearMotivation({
+    subjectId: resolvedSubjectId || subjectId,
+    isStudyActive: !loading && !loadError,
+  });
 
   // Track student PDF view once loaded
   const handleRecordView = () => {
@@ -149,9 +175,17 @@ export default function PdfViewerScreen() {
           </View>
         )}
       </View>
+
+      <ArrearMotivationToast
+        visible={isToastVisible}
+        message={currentMessage}
+        onDismiss={dismissToast}
+        position="bottom"
+      />
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   safeArea: {

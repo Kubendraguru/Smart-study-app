@@ -393,5 +393,25 @@ export interface ActiveFocusState {
   leftAppTimestamp?: number | null;
 }
 
+export type ArrearStatus = 'active' | 'passed';
+
+export type ArrearMotivationLanguage = 'both' | 'english' | 'tanglish';
+
+export interface ArrearMotivationSettings {
+  enabled: boolean;
+  language: ArrearMotivationLanguage;
+  min_interval_minutes: number;
+  max_interval_minutes: number;
+}
+
+export interface MotivationalMessage {
+  id: string;
+  text: string;
+  subtext?: string;
+  language: 'english' | 'tanglish';
+  emoji: string;
+}
+
+
 
 

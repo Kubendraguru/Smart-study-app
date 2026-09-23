@@ -17,10 +17,10 @@ import AppHeader from '@/components/layout/AppHeader';
 import BottomNav from '@/components/layout/BottomNav';
 import UnitCard from '@/components/cards/UnitCard';
 import ProgressBar from '@/components/ui/ProgressBar';
-import Badge from '@/components/ui/Badge';
-
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useArrearMotivation } from '@/hooks/useArrearMotivation';
+import ArrearMotivationToast from '@/components/arrear/ArrearMotivationToast';
 
 type SupabaseSubject = {
   id: string;
@@ -98,6 +98,12 @@ export default function SubjectDetailsScreen() {
 
   const [subject, setSubject] = useState<Subject | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Arrear study motivation hook
+  const { isToastVisible, currentMessage, dismissToast } = useArrearMotivation({
+    subjectId,
+    isStudyActive: !loading && !!subject,
+  });
 
   useEffect(() => {
     loadSubject();
@@ -563,7 +569,14 @@ export default function SubjectDetailsScreen() {
         </div>
       </PageContainer>
 
+      <ArrearMotivationToast
+        visible={isToastVisible}
+        message={currentMessage}
+        onDismiss={dismissToast}
+        position="bottom"
+      />
+
       <BottomNav />
     </>
   );
-}
+}

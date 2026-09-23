@@ -17,9 +17,10 @@ import PageContainer from '@/components/layout/PageContainer';
 import AppHeader from '@/components/layout/AppHeader';
 import IconButton from '@/components/ui/IconButton';
 import { supabase } from '@/lib/supabase';
-import { subjects } from '@/data/subjects';
 import { useAuth } from '@/context/AuthContext';
 import { recordPdfView } from '@/service/tracking';
+import { useArrearMotivation } from '@/hooks/useArrearMotivation';
+import ArrearMotivationToast from '@/components/arrear/ArrearMotivationToast';
 import type { Pdf } from '@/types';
 
 export default function PdfViewerScreen() {
@@ -30,9 +31,11 @@ export default function PdfViewerScreen() {
 
   const statePdf = location.state?.pdf as Pdf | undefined;
   const stateSubjectName = location.state?.subjectName as string | undefined;
+  const stateSubjectId = location.state?.subjectId as string | undefined;
 
   const [pdf, setPdf] = useState<Pdf | null>(statePdf ?? null);
   const [subjectName, setSubjectName] = useState<string>(stateSubjectName ?? '');
+  const [subjectId, setSubjectId] = useState<string | undefined>(stateSubjectId);
   const [loading, setLoading] = useState<boolean>(!statePdf);
   const [loadingPdf, setLoadingPdf] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<boolean>(false);
@@ -40,6 +43,12 @@ export default function PdfViewerScreen() {
   const [zoom, setZoom] = useState<number>(100);
   const [isBookmarked, setIsBookmarked] = useState<boolean>(statePdf?.bookmarked ?? false);
   const [viewRecorded, setViewRecorded] = useState<boolean>(false);
+
+  // Arrear motivation while studying PDF
+  const { isToastVisible, currentMessage, dismissToast } = useArrearMotivation({
+    subjectId,
+    isStudyActive: !loading && !loadError,
+  });
 
   const handleTrackView = (targetPdfId?: string) => {
     const idToTrack = targetPdfId || pdf?.id || pdfId;
@@ -69,16 +78,21 @@ export default function PdfViewerScreen() {
       if (material && material.file_url) {
         let detectedSubjectName = stateSubjectName || 'Study Material';
 
-        if (!stateSubjectName && material.unit_id) {
+        if (material.unit_id) {
           const { data: unitData } = await supabase
             .from('units')
-            .select('unit_title, subjects(subject_name)')
+            .select('unit_title, subject_id, subjects(id, subject_name)')
             .eq('id', material.unit_id)
             .maybeSingle();
 
           if (unitData) {
             const subj = (unitData as any).subjects;
-            detectedSubjectName = subj?.subject_name || unitData.unit_title || 'Study Material';
+            if (!stateSubjectName) {
+              detectedSubjectName = subj?.subject_name || unitData.unit_title || 'Study Material';
+            }
+            if (!subjectId) {
+              setSubjectId(unitData.subject_id || subj?.id);
+            }
           }
         }
 
@@ -357,7 +371,15 @@ export default function PdfViewerScreen() {
           Download PDF
         </button>
       </div>
+
+      <ArrearMotivationToast
+        visible={isToastVisible}
+        message={currentMessage}
+        onDismiss={dismissToast}
+        position="bottom"
+      />
     </div>
   );
 }
+
 

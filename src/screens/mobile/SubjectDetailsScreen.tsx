@@ -22,6 +22,8 @@ import { theme } from '@/theme';
 import AppHeader from '@/components/mobile/AppHeader';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useArrearMotivation } from '@/hooks/useArrearMotivation';
+import ArrearMotivationToast from '@/components/mobile/ArrearMotivationToast';
 
 type UnitItem = {
   id: string;
@@ -44,6 +46,12 @@ export default function SubjectDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [subjectData, setSubjectData] = useState<any>(null);
   const [units, setUnits] = useState<UnitItem[]>([]);
+
+  // Arrear study motivation
+  const { isToastVisible, currentMessage, dismissToast } = useArrearMotivation({
+    subjectId,
+    isStudyActive: !loading && !!subjectData,
+  });
 
   const loadData = useCallback(async () => {
     if (!subjectId) return;
@@ -247,9 +255,17 @@ export default function SubjectDetailsScreen() {
           ))}
         </ScrollView>
       )}
+
+      <ArrearMotivationToast
+        visible={isToastVisible}
+        message={currentMessage}
+        onDismiss={dismissToast}
+        position="bottom"
+      />
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   safeArea: {
