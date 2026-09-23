@@ -28,11 +28,16 @@ export async function getCompletedUnitIds(studentId?: string): Promise<Set<strin
 
     if (error) {
       // Graceful fallback if table is not created yet
-      if (error.code === '42P01' || error.message?.includes('does not exist')) {
-        console.warn('student_unit_progress table not found. Please apply migration 20260924_student_unit_progress.sql');
+      if (
+        error.code === '42P01' ||
+        error.code === 'PGRST205' ||
+        error.message?.includes('does not exist') ||
+        error.message?.includes('schema cache')
+      ) {
+        console.warn('student_unit_progress table not found in Supabase schema. Apply migration 20260924_student_unit_progress.sql');
         return new Set();
       }
-      console.error('Error fetching unit progress:', error);
+      console.warn('Notice fetching unit progress:', error.message);
       return new Set();
     }
 
@@ -107,10 +112,15 @@ export async function toggleUnitCompletion(
       );
 
     if (error) {
-      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+      if (
+        error.code === '42P01' ||
+        error.code === 'PGRST205' ||
+        error.message?.includes('does not exist') ||
+        error.message?.includes('schema cache')
+      ) {
         return {
           success: false,
-          error: 'Progress tracking table is being initialized. Please run the latest database migration.',
+          error: 'Please run the student_unit_progress SQL migration in your Supabase SQL editor.',
         };
       }
       console.error('toggleUnitCompletion error:', error);
