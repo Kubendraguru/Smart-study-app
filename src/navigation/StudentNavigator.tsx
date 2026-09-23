@@ -30,6 +30,7 @@ import YouTubeScreen from '@/screens/mobile/YouTubeScreen';
 import ArrearSubjectsScreen from '@/screens/mobile/ArrearSubjectsScreen';
 import StudentAssignmentsScreen from '@/screens/mobile/StudentAssignmentsScreen';
 import StudentProgressScreen from '@/screens/mobile/StudentProgressScreen';
+import FocusModeScreen from '@/screens/mobile/FocusModeScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -115,6 +116,7 @@ export default function StudentNavigator() {
       <Stack.Screen name="ArrearSubjects" component={ArrearSubjectsScreen} />
       <Stack.Screen name="StudentAssignments" component={StudentAssignmentsScreen} />
       <Stack.Screen name="StudentProgress" component={StudentProgressScreen} />
+      <Stack.Screen name="FocusMode" component={FocusModeScreen} />
     </Stack.Navigator>
   );
 }

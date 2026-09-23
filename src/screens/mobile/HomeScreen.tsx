@@ -26,6 +26,7 @@ import {
   Droplets,
   CheckCircle2,
   ClipboardList,
+  Hourglass,
 } from 'lucide-react-native';
 import { theme } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -291,53 +292,68 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Quick Hub Row: Planner, Assignments & Hydration */}
-        <View style={styles.quickHubRow}>
-          {/* Study Planner Card */}
-          <TouchableOpacity
-            style={styles.quickHubCard}
-            onPress={() => navigation.navigate('Planner')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.quickHubIconBox, { backgroundColor: theme.colors.primaryLight }]}>
-              <Calendar size={18} color={theme.colors.primary} />
-            </View>
-            <Text style={styles.quickHubTitle}>Planner</Text>
-            <Text style={styles.quickHubSub}>
-              {plannerProgress.total > 0
-                ? `${plannerProgress.completed}/${plannerProgress.total} Done`
-                : 'Daily Tasks'}
-            </Text>
-          </TouchableOpacity>
+        {/* Quick Hub Row: Planner, Focus Mode, Assignments & Hydration */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+          <View style={[styles.quickHubRow, { gap: 10, marginBottom: 0 }]}>
+            {/* Study Planner Card */}
+            <TouchableOpacity
+              style={[styles.quickHubCard, { minWidth: 105 }]}
+              onPress={() => navigation.navigate('Planner')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickHubIconBox, { backgroundColor: theme.colors.primaryLight }]}>
+                <Calendar size={18} color={theme.colors.primary} />
+              </View>
+              <Text style={styles.quickHubTitle}>Planner</Text>
+              <Text style={styles.quickHubSub}>
+                {plannerProgress.total > 0
+                  ? `${plannerProgress.completed}/${plannerProgress.total} Done`
+                  : 'Daily Tasks'}
+              </Text>
+            </TouchableOpacity>
 
-          {/* Assignments Card */}
-          <TouchableOpacity
-            style={styles.quickHubCard}
-            onPress={() => navigation.navigate('StudentAssignments')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.quickHubIconBox, { backgroundColor: '#ECFDF5' }]}>
-              <ClipboardList size={18} color="#059669" />
-            </View>
-            <Text style={styles.quickHubTitle}>Assignments</Text>
-            <Text style={styles.quickHubSub}>View Due Tasks</Text>
-          </TouchableOpacity>
+            {/* Focus Mode Card */}
+            <TouchableOpacity
+              style={[styles.quickHubCard, { minWidth: 105 }]}
+              onPress={() => navigation.navigate('FocusMode')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickHubIconBox, { backgroundColor: '#FDF2F8' }]}>
+                <Hourglass size={18} color="#DB2777" />
+              </View>
+              <Text style={styles.quickHubTitle}>Focus Mode</Text>
+              <Text style={styles.quickHubSub}>Study Timer</Text>
+            </TouchableOpacity>
 
-          {/* Hydration Tracker Card */}
-          <TouchableOpacity
-            style={styles.quickHubCard}
-            onPress={() => navigation.navigate('Hydration')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.quickHubIconBox, { backgroundColor: '#E0F2FE' }]}>
-              <Droplets size={18} color="#0284C7" />
-            </View>
-            <Text style={styles.quickHubTitle}>Hydration</Text>
-            <Text style={styles.quickHubSub}>
-              {waterMl > 0 ? `${waterMl}ml` : 'Stay Hydrated'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            {/* Assignments Card */}
+            <TouchableOpacity
+              style={[styles.quickHubCard, { minWidth: 105 }]}
+              onPress={() => navigation.navigate('StudentAssignments')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickHubIconBox, { backgroundColor: '#ECFDF5' }]}>
+                <ClipboardList size={18} color="#059669" />
+              </View>
+              <Text style={styles.quickHubTitle}>Assignments</Text>
+              <Text style={styles.quickHubSub}>View Tasks</Text>
+            </TouchableOpacity>
+
+            {/* Hydration Tracker Card */}
+            <TouchableOpacity
+              style={[styles.quickHubCard, { minWidth: 105 }]}
+              onPress={() => navigation.navigate('Hydration')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickHubIconBox, { backgroundColor: '#E0F2FE' }]}>
+                <Droplets size={18} color="#0284C7" />
+              </View>
+              <Text style={styles.quickHubTitle}>Hydration</Text>
+              <Text style={styles.quickHubSub}>
+                {waterMl > 0 ? `${waterMl}ml` : 'Stay Hydrated'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
 
 
         {/* Progress Card */}

@@ -24,6 +24,7 @@ import TeacherAnnouncementsScreen from '@/screens/teacher/TeacherAnnouncementsSc
 import ArrearSubjectsScreen from '@/screens/student/ArrearSubjectsScreen';
 import StudentAssignmentsScreen from '@/screens/student/StudentAssignmentsScreen';
 import StudentProgressScreen from '@/screens/student/StudentProgressScreen';
+import FocusModeScreen from '@/screens/student/FocusModeScreen';
 import AddPdfScreen from '@/screens/teacher/AddPdfScreen';
 import PdfTrackingScreen from '@/screens/teacher/PdfTrackingScreen';
 import TeacherAssignmentsScreen from '@/screens/teacher/TeacherAssignmentsScreen';
@@ -75,6 +76,14 @@ export default function App() {
           element={
             <ProtectedRoute role="student">
               <StudentProgressScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/focus"
+          element={
+            <ProtectedRoute role="student">
+              <FocusModeScreen />
             </ProtectedRoute>
           }
         />

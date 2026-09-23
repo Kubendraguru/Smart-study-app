@@ -346,4 +346,52 @@ export interface TeacherCohortProgress {
   students: CohortStudentProgress[];
 }
 
+export type FocusSessionStatus =
+  | 'active'
+  | 'paused'
+  | 'completed'
+  | 'manually_ended'
+  | 'emergency_ended';
+
+export interface FocusSession {
+  id: string;
+  student_id: string;
+  subject_id?: string | null;
+  unit_id?: string | null;
+  planned_duration_minutes: number;
+  actual_duration_seconds: number;
+  status: FocusSessionStatus;
+  started_at: string;
+  ended_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  subject?: {
+    id: string;
+    subject_code: string;
+    subject_name: string;
+  };
+  unit?: {
+    id: string;
+    unit_number: number;
+    unit_title?: string;
+    title?: string;
+  };
+}
+
+export interface ActiveFocusState {
+  sessionId?: string;
+  plannedMinutes: number;
+  subjectId?: string;
+  subjectName?: string;
+  unitId?: string;
+  unitTitle?: string;
+  startTimestamp: number;
+  targetEndTimestamp: number;
+  isPaused: boolean;
+  pausedRemainingSeconds: number;
+  isIntentionalNavigation: boolean;
+  leftAppTimestamp?: number | null;
+}
+
+
 

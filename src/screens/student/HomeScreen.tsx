@@ -10,6 +10,7 @@ import {
   LogOut,
   ClipboardList,
   Sparkles,
+  Hourglass,
 } from 'lucide-react';
 
 import PageContainer from '@/components/layout/PageContainer';
@@ -303,7 +304,18 @@ const recentlyViewed = currentSubjects.slice(0, 3);
           </motion.div>
 
           {/* Quick Hub Row */}
-          <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <button
+              onClick={() => navigate('/focus')}
+              className="bg-white rounded-2xl p-3.5 flex flex-col items-center gap-1.5 shadow-sm border border-gray-100 hover:shadow-md transition-all text-left"
+            >
+              <div className="w-10 h-10 rounded-xl bg-pink-50 text-pink-600 flex items-center justify-center">
+                <Hourglass size={20} />
+              </div>
+              <span className="text-xs font-bold text-gray-800">Focus Mode</span>
+              <span className="text-[10px] text-gray-400">Study timer</span>
+            </button>
+
             <button
               onClick={() => navigate('/assignments')}
               className="bg-white rounded-2xl p-3.5 flex flex-col items-center gap-1.5 shadow-sm border border-gray-100 hover:shadow-md transition-all text-left"
