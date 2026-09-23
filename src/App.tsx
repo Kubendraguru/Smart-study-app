@@ -23,9 +23,12 @@ import AddYoutubeScreen from '@/screens/teacher/AddYoutubeScreen';
 import TeacherAnnouncementsScreen from '@/screens/teacher/TeacherAnnouncementsScreen';
 import ManageMaterialsScreen from '@/screens/teacher/ManageMaterialsScreen';
 import ArrearSubjectsScreen from '@/screens/student/ArrearSubjectsScreen';
+import StudentAssignmentsScreen from '@/screens/student/StudentAssignmentsScreen';
 import AddPdfScreen from '@/screens/teacher/AddPdfScreen';
 import PdfTrackingScreen from '@/screens/teacher/PdfTrackingScreen';
-
+import TeacherAssignmentsScreen from '@/screens/teacher/TeacherAssignmentsScreen';
+import TeacherBooksScreen from '@/screens/teacher/TeacherBooksScreen';
+import TeacherSettingsScreen from '@/screens/teacher/TeacherSettingsScreen';
 
 export default function App() {
   return (
@@ -36,14 +39,14 @@ export default function App() {
         <Route path="/login" element={<LoginScreen />} />
 
         {/* Student routes */}
-   <Route
-  path="/home"
-  element={
-    <ProtectedRoute role="student">
-      <HomeScreen />
-    </ProtectedRoute>
-  }
-/>
+        <Route
+          path="/home"
+          element={
+            <ProtectedRoute role="student">
+              <HomeScreen />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/semester/:semesterId" element={<SemesterScreen />} />
         <Route path="/subjects" element={<SubjectsScreen />} />
         <Route path="/subject/:subjectId" element={<SubjectDetailsScreen />} />
@@ -52,45 +55,57 @@ export default function App() {
         <Route path="/youtube/:videoId" element={<YouTubeScreen />} />
         <Route path="/ai-assistant" element={<AIAssistantScreen />} />
         <Route
-  path="/arrear-subjects"
-  element={
-    <ProtectedRoute>
-      <ArrearSubjectsScreen />
-    </ProtectedRoute>
-  }
-/>
-      <Route
-  path="/bookmarks"
-  element={
-    <ProtectedRoute>
-      <BookmarksScreen />
-    </ProtectedRoute>
-  }
-/>
+          path="/arrear-subjects"
+          element={
+            <ProtectedRoute>
+              <ArrearSubjectsScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/assignments"
+          element={
+            <ProtectedRoute>
+              <StudentAssignmentsScreen />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/bookmarks"
+          element={
+            <ProtectedRoute>
+              <BookmarksScreen />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/notifications" element={<NotificationsScreen />} />
-       <Route
-  path="/profile"
-  element={
-    <ProtectedRoute>
-      <ProfileScreen />
-    </ProtectedRoute>
-  }
-/>
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfileScreen />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Teacher routes */}
-   <Route
-  path="/teacher/dashboard"
-  element={
-    <ProtectedRoute role="teacher">
-      <TeacherDashboardScreen />
-    </ProtectedRoute>
-  }
-/>
+        <Route
+          path="/teacher/dashboard"
+          element={
+            <ProtectedRoute role="teacher">
+              <TeacherDashboardScreen />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/teacher/upload-pdf" element={<UploadPdfScreen />} />
         <Route path="/teacher/upload-notes" element={<UploadNotesScreen />} />
         <Route path="/teacher/add-subject" element={<AddSubjectScreen />} />
         <Route path="/teacher/add-unit" element={<AddUnitScreen />} />
         <Route path="/teacher/add-youtube" element={<AddYoutubeScreen />} />
+        <Route path="/teacher/assignments" element={<TeacherAssignmentsScreen />} />
+        <Route path="/teacher/books" element={<TeacherBooksScreen />} />
+        <Route path="/teacher/settings" element={<TeacherSettingsScreen />} />
         <Route path="/teacher/announcements" element={<TeacherAnnouncementsScreen />} />
         <Route path="/teacher/manage-materials" element={<ManageMaterialsScreen />} />
         <Route
@@ -116,7 +131,6 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      
     </BrowserRouter>
   );
 }

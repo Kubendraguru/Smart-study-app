@@ -8,6 +8,8 @@ import {
   TrendingUp,
   ChevronRight,
   LogOut,
+  ClipboardList,
+  Sparkles,
 } from 'lucide-react';
 
 import PageContainer from '@/components/layout/PageContainer';
@@ -54,20 +56,28 @@ async function loadSubjects() {
   setLoading(true);
 
   try {
+    // 0. Get student profile semester
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('semester, full_name')
+      .eq('id', user.id)
+      .single();
+
+    const studentSem = profile?.semester || 5;
+
     // 1. Get current semester subjects
     const { data: currentSubjects, error: currentError } =
       await supabase
         .from('subjects')
         .select('*')
-        .eq('semester', 5)
+        .eq('semester', studentSem)
         .order('subject_name', { ascending: true });
 
     if (currentError) {
       console.error('Error loading current subjects:', currentError);
-      return;
     }
 
-    // 2. Get ONLY student's arrear subjects
+    // 2. Get student's arrear subjects
     const { data: studentArrears, error: arrearError } =
       await supabase
         .from('student_subjects')
@@ -89,20 +99,16 @@ async function loadSubjects() {
 
     if (arrearError) {
       console.error('Error loading arrears:', arrearError);
-      return;
     }
 
-    // 3. Remove invalid arrears and make sure they are
-    // actually from previous semesters
     const arrearSubjects = (studentArrears ?? [])
       .map((item: any) => item.subjects)
       .filter(
         (subject: any) =>
           subject &&
-          subject.semester < 5
+          subject.semester < studentSem
       );
 
-    // 4. Remove duplicate arrears by subject ID
     const uniqueArrears = Array.from(
       new Map(
         arrearSubjects.map((subject: any) => [
@@ -112,7 +118,6 @@ async function loadSubjects() {
       ).values()
     );
 
-    // 5. Format current semester subjects
     const formattedCurrentSubjects: Subject[] = (
       currentSubjects ?? []
     ).map((subject: SupabaseSubject) => ({
@@ -129,7 +134,6 @@ async function loadSubjects() {
       isArrear: false,
     }));
 
-    // 6. Format arrear subjects
     const formattedArrears: Subject[] = uniqueArrears.map(
       (subject: any) => ({
         id: subject.id,
@@ -146,13 +150,10 @@ async function loadSubjects() {
       })
     );
 
-    // 7. Current subjects + unique arrears
-    const allSubjects = [
+    setSubjects([
       ...formattedCurrentSubjects,
       ...formattedArrears,
-    ];
-
-    setSubjects(allSubjects);
+    ]);
   } catch (error) {
     console.error('Unexpected error:', error);
   } finally {
@@ -287,6 +288,42 @@ const recentlyViewed = currentSubjects.slice(0, 3);
             </div>
           </motion.div>
 
+          {/* Quick Hub Row */}
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <button
+              onClick={() => navigate('/assignments')}
+              className="bg-white rounded-2xl p-3.5 flex flex-col items-center gap-1.5 shadow-sm border border-gray-100 hover:shadow-md transition-all text-left"
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <ClipboardList size={20} />
+              </div>
+              <span className="text-xs font-bold text-gray-800">Assignments</span>
+              <span className="text-[10px] text-gray-400">View tasks</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/arrear-subjects')}
+              className="bg-white rounded-2xl p-3.5 flex flex-col items-center gap-1.5 shadow-sm border border-gray-100 hover:shadow-md transition-all text-left"
+            >
+              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+                <GraduationCap size={20} />
+              </div>
+              <span className="text-xs font-bold text-gray-800">Arrears</span>
+              <span className="text-[10px] text-gray-400">Backlog courses</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/ai-assistant')}
+              className="bg-white rounded-2xl p-3.5 flex flex-col items-center gap-1.5 shadow-sm border border-gray-100 hover:shadow-md transition-all text-left"
+            >
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Sparkles size={20} />
+              </div>
+              <span className="text-xs font-bold text-gray-800">Ask AI</span>
+              <span className="text-[10px] text-gray-400">Doubts & notes</span>
+            </button>
+          </div>
+
           {/* Continue Learning */}
           {continueLearning.length > 0 && (
             <div className="mb-6">
@@ -399,22 +436,47 @@ const recentlyViewed = currentSubjects.slice(0, 3);
         </div>
       )}
 
-      {/* Arrear Subjects */}
-      {arrearSubjects.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
+      {/* Dedicated My Arrear Subjects Section */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
             <h3 className="text-xs font-bold text-red-500 uppercase tracking-wide">
-              Arrear Subjects
+              My Arrear Subjects
             </h3>
-
-            <button
-              onClick={() => navigate('/arrear-subjects')}
-              className="text-xs font-semibold text-blue-600"
-            >
-              Manage
-            </button>
+            {arrearSubjects.length > 0 && (
+              <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
+                {arrearSubjects.length}
+              </span>
+            )}
           </div>
 
+          <button
+            onClick={() => navigate('/arrear-subjects')}
+            className="text-xs font-semibold text-blue-600 hover:underline"
+          >
+            {arrearSubjects.length > 0 ? 'Manage Arrears' : '+ Add Arrears'}
+          </button>
+        </div>
+
+        {arrearSubjects.length === 0 ? (
+          <div
+            onClick={() => navigate('/arrear-subjects')}
+            className="bg-white rounded-2xl p-4 border border-dashed border-red-200 cursor-pointer hover:border-red-400 transition-all flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-600">
+                <GraduationCap size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Need to clear backlogs?</p>
+                <p className="text-xs text-gray-500">
+                  Select previous semester courses to access lecture notes, videos & exams.
+                </p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-red-400" />
+          </div>
+        ) : (
           <div className="space-y-3">
             {arrearSubjects.map((subject, i) => (
               <SubjectCard
@@ -424,10 +486,10 @@ const recentlyViewed = currentSubjects.slice(0, 3);
               />
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* No subjects */}
+      {/* No subjects at all */}
       {currentSubjects.length === 0 &&
         arrearSubjects.length === 0 && (
           <div className="text-center py-8">

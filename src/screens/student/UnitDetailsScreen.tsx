@@ -4,8 +4,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   FileText,
   Video,
-  HelpCircle,
+  ListVideo,
   ClipboardList,
+  BookOpen,
+  Calendar,
+  Clock,
+  ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 
 import PageContainer from '@/components/layout/PageContainer';
@@ -15,8 +20,12 @@ import PdfCard from '@/components/cards/PdfCard';
 import VideoCard from '@/components/cards/VideoCard';
 import Badge from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
+import { getVideos } from '@/service/videos';
+import { getAssignments } from '@/service/assignments';
+import { getBooks } from '@/service/books';
+import type { Video as VideoType, Book, Assignment } from '@/types';
 
-type Tab = 'pdfs' | 'videos' | 'questions' | 'assignments';
+type Tab = 'pdfs' | 'videos' | 'playlists' | 'assignments' | 'books';
 
 type Unit = {
   id: string;
@@ -25,10 +34,6 @@ type Unit = {
   title: string;
   description: string | null;
   completed: boolean;
-  pdfs: any[];
-  videos: any[];
-  importantQuestions: any[];
-  assignments: any[];
 };
 
 export default function UnitDetailsScreen() {
@@ -38,6 +43,12 @@ export default function UnitDetailsScreen() {
   const [tab, setTab] = useState<Tab>('pdfs');
   const [unit, setUnit] = useState<Unit | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [pdfs, setPdfs] = useState<any[]>([]);
+  const [videos, setVideos] = useState<VideoType[]>([]);
+  const [playlists, setPlaylists] = useState<VideoType[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [books, setBooks] = useState<Book[]>([]);
 
   useEffect(() => {
     loadUnit();
@@ -52,33 +63,35 @@ export default function UnitDetailsScreen() {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase
+      // 1. Fetch Unit Info
+      const { data: unitData, error: unitError } = await supabase
         .from('units')
         .select('*')
         .eq('id', unitId)
         .single();
 
-      if (error) {
-        console.error('Error loading unit:', error);
+      if (unitError || !unitData) {
+        console.error('Error loading unit:', unitError);
         setUnit(null);
         return;
       }
 
-      if (!data) {
-        setUnit(null);
-        return;
-      }
+      setUnit({
+        id: unitData.id,
+        subject_id: unitData.subject_id,
+        unit_number: unitData.unit_number,
+        title: unitData.unit_title ?? unitData.title ?? `Unit ${unitData.unit_number}`,
+        description: unitData.description ?? '',
+        completed: unitData.completed ?? false,
+      });
 
-      const { data: materialsData, error: materialsError } = await supabase
+      // 2. Fetch PDFs from materials
+      const { data: materialsData } = await supabase
         .from('materials')
         .select('*')
         .eq('unit_id', unitId)
         .or('material_type.ilike.pdf,file_url.ilike.%.pdf')
         .order('created_at', { ascending: false });
-
-      if (materialsError) {
-        console.error('Error loading materials:', materialsError);
-      }
 
       const formattedPdfs = (materialsData ?? []).map((m: any) => ({
         id: m.id,
@@ -91,20 +104,22 @@ export default function UnitDetailsScreen() {
         file_url: m.file_url,
         bookmarked: false,
       }));
+      setPdfs(formattedPdfs);
 
-      setUnit({
-        id: data.id,
-        subject_id: data.subject_id,
-        unit_number: data.unit_number,
-        title: data.unit_title ?? data.title ?? `Unit ${data.unit_number}`,
-        description: data.description ?? '',
-        completed: data.completed ?? false,
+      // 3. Fetch Single Videos & Playlists, Assignments, and Books
+      const [allVids, assigns, bks] = await Promise.all([
+        getVideos(subjectId, unitId),
+        getAssignments({ subjectId, unitId }),
+        getBooks(subjectId, unitId),
+      ]);
 
-        pdfs: formattedPdfs,
-        videos: [],
-        importantQuestions: [],
-        assignments: [],
-      });
+      const singleVideos = allVids.filter((v) => !v.is_playlist && v.video_type !== 'playlist');
+      const playlistVideos = allVids.filter((v) => v.is_playlist || v.video_type === 'playlist');
+
+      setVideos(singleVideos);
+      setPlaylists(playlistVideos);
+      setAssignments(assigns);
+      setBooks(bks);
     } catch (error) {
       console.error('Unexpected error loading unit:', error);
       setUnit(null);
@@ -113,43 +128,27 @@ export default function UnitDetailsScreen() {
     }
   }
 
-  // ----------------------------------------
-  // Loading
-  // ----------------------------------------
-
   if (loading) {
     return (
       <>
         <AppHeader title="Unit" showBack />
-
         <PageContainer showBottomNav>
           <div className="pt-20 text-center">
-            <p className="text-sm text-gray-500">
-              Loading unit...
-            </p>
+            <p className="text-sm text-gray-500">Loading unit resources...</p>
           </div>
         </PageContainer>
-
         <BottomNav />
       </>
     );
   }
 
-  // ----------------------------------------
-  // Unit not found
-  // ----------------------------------------
-
   if (!unit) {
     return (
       <>
         <AppHeader title="Unit" showBack />
-
         <PageContainer showBottomNav>
           <div className="pt-20 text-center">
-            <p className="text-sm text-gray-500">
-              Unit not found.
-            </p>
-
+            <p className="text-sm text-gray-500">Unit not found.</p>
             <button
               onClick={() => navigate(-1)}
               className="mt-4 text-sm font-semibold text-blue-600"
@@ -158,96 +157,48 @@ export default function UnitDetailsScreen() {
             </button>
           </div>
         </PageContainer>
-
         <BottomNav />
       </>
     );
   }
 
-  // ----------------------------------------
-  // Tabs
-  // ----------------------------------------
-
   const tabs: {
     id: Tab;
     label: string;
-    icon: typeof FileText;
+    icon: any;
     count: number;
   }[] = [
-    {
-      id: 'pdfs',
-      label: 'PDFs',
-      icon: FileText,
-      count: unit.pdfs.length,
-    },
-    {
-      id: 'videos',
-      label: 'Videos',
-      icon: Video,
-      count: unit.videos.length,
-    },
-    {
-      id: 'questions',
-      label: 'Questions',
-      icon: HelpCircle,
-      count: unit.importantQuestions.length,
-    },
-    {
-      id: 'assignments',
-      label: 'Assignments',
-      icon: ClipboardList,
-      count: unit.assignments.length,
-    },
+    { id: 'pdfs', label: 'PDFs', icon: FileText, count: pdfs.length },
+    { id: 'videos', label: 'Videos', icon: Video, count: videos.length },
+    { id: 'playlists', label: 'Playlists', icon: ListVideo, count: playlists.length },
+    { id: 'assignments', label: 'Assignments', icon: ClipboardList, count: assignments.length },
+    { id: 'books', label: 'Books', icon: BookOpen, count: books.length },
   ];
 
   return (
     <>
-      <AppHeader
-        title={`Unit ${unit.unit_number}`}
-        showBack
-      />
-
+      <AppHeader title={`Unit ${unit.unit_number}`} showBack />
       <PageContainer showBottomNav>
         <div className="pt-4">
-
           {/* Unit information */}
           <motion.div
-            initial={{
-              opacity: 0,
-              y: 20,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            className="bg-white rounded-2xl p-5 shadow-sm shadow-gray-200/60 border border-gray-100 mb-5"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-5"
           >
             <div className="flex items-center gap-2 mb-2">
-
-              <Badge color="blue">
-                Unit {unit.unit_number}
-              </Badge>
-
-              {unit.completed && (
-                <Badge color="green">
-                  Completed
-                </Badge>
-              )}
-
+              <Badge color="blue">Unit {unit.unit_number}</Badge>
+              {unit.completed && <Badge color="green">Completed</Badge>}
             </div>
 
-            <h2 className="text-lg font-bold text-gray-900 mb-1">
-              {unit.title}
-            </h2>
-
-            <p className="text-sm text-gray-500 leading-relaxed">
-              {unit.description}
-            </p>
+            <h2 className="text-lg font-bold text-gray-900 mb-1">{unit.title}</h2>
+            {unit.description && (
+              <p className="text-sm text-gray-500 leading-relaxed">{unit.description}</p>
+            )}
           </motion.div>
 
-          {/* Tabs */}
+          {/* 5-Resource Tabs */}
           <div className="flex gap-2 mb-5 overflow-x-auto pb-1 scrollbar-hide">
-
             {tabs.map((t) => {
               const TabIcon = t.icon;
               const isActive = tab === t.id;
@@ -256,21 +207,17 @@ export default function UnitDetailsScreen() {
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+                  className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
                     isActive
                       ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                      : 'bg-gray-50 text-gray-500'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                   }`}
                 >
                   <TabIcon size={15} />
-
                   {t.label}
-
                   <span
                     className={`text-xs px-1.5 py-0.5 rounded-full ${
-                      isActive
-                        ? 'bg-white/20'
-                        : 'bg-gray-200'
+                      isActive ? 'bg-white/20' : 'bg-gray-200'
                     }`}
                   >
                     {t.count}
@@ -278,30 +225,21 @@ export default function UnitDetailsScreen() {
                 </button>
               );
             })}
-
           </div>
 
           {/* Content */}
           <motion.div
             key={tab}
-            initial={{
-              opacity: 0,
-              y: 10,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
           >
-
             {/* PDFs */}
             {tab === 'pdfs' && (
               <div className="space-y-3">
-
-                {unit.pdfs.length === 0 ? (
-                  <EmptyState message="No PDFs available yet." />
+                {pdfs.length === 0 ? (
+                  <EmptyState message="No PDFs available for this unit yet." />
                 ) : (
-                  unit.pdfs.map((pdf, i) => (
+                  pdfs.map((pdf, i) => (
                     <PdfCard
                       key={pdf.id}
                       pdf={pdf}
@@ -314,163 +252,163 @@ export default function UnitDetailsScreen() {
                     />
                   ))
                 )}
-
               </div>
             )}
 
-            {/* Videos */}
+            {/* Single Videos */}
             {tab === 'videos' && (
               <div className="grid grid-cols-2 gap-3">
-
-                {unit.videos.length === 0 ? (
+                {videos.length === 0 ? (
                   <div className="col-span-2">
-                    <EmptyState message="No videos available yet." />
+                    <EmptyState message="No single video lectures linked yet." />
                   </div>
                 ) : (
-                  unit.videos.map((video, i) => (
+                  videos.map((video, i) => (
                     <VideoCard
                       key={video.id}
                       video={video}
                       index={i}
-                      onClick={() =>
-                        navigate(`/youtube/${video.id}`)
-                      }
+                      onClick={() => navigate(`/youtube/${video.id}`)}
                     />
                   ))
                 )}
-
               </div>
             )}
 
-            {/* Questions */}
-            {tab === 'questions' && (
+            {/* Playlists */}
+            {tab === 'playlists' && (
               <div className="space-y-3">
-
-                {unit.importantQuestions.length === 0 ? (
-                  <EmptyState message="No important questions available yet." />
+                {playlists.length === 0 ? (
+                  <EmptyState message="No YouTube playlists attached to this unit." />
                 ) : (
-                  unit.importantQuestions.map(
-                    (q, i) => (
-                      <motion.div
-                        key={q.id ?? i}
-                        initial={{
-                          opacity: 0,
-                          x: -20,
-                        }}
-                        animate={{
-                          opacity: 1,
-                          x: 0,
-                        }}
-                        transition={{
-                          delay: i * 0.05,
-                        }}
-                        className="bg-white rounded-2xl p-4 shadow-sm shadow-gray-200/60 border border-gray-100"
-                      >
-                        <div className="flex items-start gap-3">
-
-                          <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs font-bold text-amber-600">
-                              Q{i + 1}
-                            </span>
-                          </div>
-
-                          <p className="text-sm text-gray-700 leading-relaxed">
-                            {q.question ?? q}
-                          </p>
-
+                  playlists.map((pl, i) => (
+                    <motion.a
+                      key={pl.id}
+                      href={pl.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.04 }}
+                      className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between hover:shadow-md transition-all block"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
+                          <ListVideo size={22} className="text-red-600" />
                         </div>
-                      </motion.div>
-                    )
-                  )
+                        <div>
+                          <h4 className="font-bold text-gray-900 text-sm">{pl.title}</h4>
+                          <p className="text-xs text-gray-500">{pl.channel || 'YouTube Course'}</p>
+                          <span className="inline-block mt-1 text-[11px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                            {pl.duration || 'Full Course Playlist'}
+                          </span>
+                        </div>
+                      </div>
+                      <ExternalLink size={16} className="text-gray-400" />
+                    </motion.a>
+                  ))
                 )}
-
               </div>
             )}
 
             {/* Assignments */}
             {tab === 'assignments' && (
               <div className="space-y-3">
-
-                {unit.assignments.length === 0 ? (
-                  <EmptyState message="No assignments available yet." />
+                {assignments.length === 0 ? (
+                  <EmptyState message="No assignments published for this unit." />
                 ) : (
-                  unit.assignments.map(
-                    (a, i) => (
-                      <motion.div
-                        key={a.id ?? i}
-                        initial={{
-                          opacity: 0,
-                          x: -20,
-                        }}
-                        animate={{
-                          opacity: 1,
-                          x: 0,
-                        }}
-                        transition={{
-                          delay: i * 0.05,
-                        }}
-                        className="bg-white rounded-2xl p-4 shadow-sm shadow-gray-200/60 border border-gray-100"
-                      >
-                        <div className="flex items-start gap-3">
-
-                          <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                            <ClipboardList
-                              size={16}
-                              className="text-emerald-600"
-                            />
-                          </div>
-
-                          <div className="flex-1">
-
-                            <p className="text-sm text-gray-700 leading-relaxed mb-2">
-                              {a.title ?? a}
-                            </p>
-
-                            <Badge color="green">
-                              Pending
-                            </Badge>
-
-                          </div>
-
+                  assignments.map((a, i) => (
+                    <motion.div
+                      key={a.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.04 }}
+                      className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                          <ClipboardList size={18} className="text-emerald-600" />
                         </div>
-                      </motion.div>
-                    )
-                  )
+                        <div className="flex-1">
+                          <h4 className="font-bold text-gray-900 text-sm mb-1">{a.title}</h4>
+                          {a.description && (
+                            <p className="text-xs text-gray-600 mb-2 leading-relaxed">{a.description}</p>
+                          )}
+                          <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-50">
+                            <span className="flex items-center gap-1 text-amber-700 font-semibold">
+                              <Calendar size={12} />
+                              Due: {a.due_date} {a.due_time || ''}
+                            </span>
+                            <span className="font-bold text-emerald-600">{a.max_marks} Marks</span>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
                 )}
-
               </div>
             )}
 
+            {/* Books */}
+            {tab === 'books' && (
+              <div className="space-y-3">
+                {books.length === 0 ? (
+                  <EmptyState message="No textbooks recommended for this unit yet." />
+                ) : (
+                  books.map((b, i) => (
+                    <motion.div
+                      key={b.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.04 }}
+                      className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                          <BookOpen size={20} className="text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-bold text-gray-900 text-sm">{b.title}</h4>
+                          {b.author && <p className="text-xs text-gray-500">by {b.author}</p>}
+                          {b.edition && (
+                            <span className="inline-block text-[11px] font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md mt-1 mb-1">
+                              {b.edition}
+                            </span>
+                          )}
+                          {b.description && (
+                            <p className="text-xs text-gray-600 mt-1 leading-relaxed">{b.description}</p>
+                          )}
+                          {b.file_url && (
+                            <a
+                              href={b.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline mt-2"
+                            >
+                              <ExternalLink size={12} />
+                              View Reference
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            )}
           </motion.div>
         </div>
       </PageContainer>
-
       <BottomNav />
     </>
   );
 }
 
-
-// ----------------------------------------
-// Empty state
-// ----------------------------------------
-
-function EmptyState({
-  message,
-}: {
-  message: string;
-}) {
+function EmptyState({ message }: { message: string }) {
   return (
-    <div className="text-center py-10">
-
-      <p className="text-sm font-medium text-gray-700">
-        {message}
-      </p>
-
-      <p className="text-xs text-gray-500 mt-1">
-        Learning materials added by teachers will appear here.
-      </p>
-
+    <div className="text-center py-10 bg-white rounded-2xl border border-gray-100 p-6">
+      <p className="text-sm font-semibold text-gray-700">{message}</p>
+      <p className="text-xs text-gray-400 mt-1">Resources uploaded by teachers will appear here.</p>
     </div>
   );
 }

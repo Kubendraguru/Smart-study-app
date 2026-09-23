@@ -41,21 +41,72 @@ export interface Pdf {
 export interface Video {
   id: string;
   title: string;
-  channel: string;
-  duration: string;
-  thumbnail: string;
+  channel?: string;
+  duration?: string;
+  thumbnail?: string;
   url: string;
-  bookmarked: boolean;
+  bookmarked?: boolean;
+  subject_id?: string;
+  unit_id?: string;
+  teacher_id?: string;
+  is_playlist?: boolean;
+  video_type?: 'video' | 'playlist';
+  created_at?: string;
+}
+
+export interface Assignment {
+  id: string;
+  teacher_id: string;
+  subject_id: string;
+  unit_id?: string | null;
+  title: string;
+  description?: string | null;
+  due_date: string;
+  due_time?: string | null;
+  max_marks?: number;
+  attachment_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  subject?: {
+    id: string;
+    subject_code: string;
+    subject_name: string;
+  };
+  unit?: {
+    id: string;
+    unit_number: number;
+    unit_title: string;
+  };
+}
+
+export interface Book {
+  id: string;
+  title: string;
+  author?: string;
+  edition?: string;
+  description?: string;
+  cover_url?: string;
+  file_url?: string;
+  purchase_link?: string;
+  subject_id?: string;
+  unit_id?: string;
+  teacher_id?: string;
+  created_at?: string;
 }
 
 export interface Announcement {
   id: string;
   title: string;
   message: string;
-  date: string;
-  subject: string;
+  date?: string;
+  subject?: string;
+  subject_id?: string;
+  teacher_id?: string;
   priority: 'high' | 'medium' | 'low';
-  read: boolean;
+  read?: boolean;
+  created_at?: string;
+  teacher_name?: string;
+  subject_name?: string;
 }
 
 export interface Notification {
@@ -95,3 +146,130 @@ export interface PdfTrackingStats {
   viewedStudents: StudentViewRecord[];
   notViewedStudents: StudentViewRecord[];
 }
+
+export type TaskPriority = 'low' | 'medium' | 'high';
+export type TaskStatus = 'pending' | 'completed' | 'missed';
+
+export interface StudyTask {
+  id: string;
+  student_id: string;
+  plan_id?: string | null;
+  subject_id?: string | null;
+  unit_id?: string | null;
+  title: string;
+  description?: string | null;
+  study_date: string; // YYYY-MM-DD
+  start_time: string; // HH:MM or HH:MM:SS
+  end_time: string; // HH:MM or HH:MM:SS
+  priority: TaskPriority;
+  status: TaskStatus;
+  reminder_enabled: boolean;
+  reminder_minutes_before: number;
+  notification_id?: string | null;
+  is_ai_generated?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  // Populated fields
+  subject?: {
+    id: string;
+    subject_code: string;
+    subject_name: string;
+  };
+  unit?: {
+    id: string;
+    unit_number: number;
+    unit_title: string;
+  };
+}
+
+export interface Exam {
+  id: string;
+  subject_id: string;
+  teacher_id: string;
+  exam_title: string;
+  exam_date: string; // YYYY-MM-DD
+  exam_time?: string | null; // HH:MM or HH:MM:SS
+  location?: string | null;
+  instructions?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  // Populated fields
+  subject?: {
+    id: string;
+    subject_code: string;
+    subject_name: string;
+    semester?: number;
+    department?: string;
+  };
+  days_remaining?: number;
+  formatted_date?: string;
+}
+
+export interface HydrationLog {
+  id: string;
+  student_id: string;
+  amount_ml: number;
+  logged_at: string;
+  log_date: string;
+}
+
+export interface StudentNotificationSettings {
+  id?: string;
+  student_id: string;
+  hydration_enabled: boolean;
+  hydration_interval_minutes: number;
+  hydration_start_time: string; // HH:MM or HH:MM:SS
+  hydration_end_time: string; // HH:MM or HH:MM:SS
+  hydration_daily_goal_ml: number;
+  exam_reminders_enabled: boolean;
+  study_task_reminders_enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StudyPlan {
+  id: string;
+  student_id: string;
+  title: string;
+  description?: string | null;
+  target_exam_ids?: string[];
+  available_hours_per_day: number;
+  preferred_start_time: string;
+  preferred_end_time: string;
+  difficulty_preferences?: Record<string, 'easy' | 'medium' | 'hard'>;
+  status: 'active' | 'completed' | 'archived';
+  ai_summary?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  tasks?: StudyTask[];
+  total_tasks_count?: number;
+  completed_tasks_count?: number;
+}
+
+export interface AISessionItem {
+  subject_id?: string;
+  subject_name: string;
+  unit_id?: string;
+  unit_title?: string;
+  title: string;
+  description: string;
+  start_time: string; // "09:00"
+  end_time: string; // "10:30"
+  priority: TaskPriority;
+  type: 'learning' | 'revision' | 'practice';
+}
+
+export interface AIDaySchedule {
+  date: string; // YYYY-MM-DD
+  day_name: string; // "Monday", "Tuesday", etc.
+  sessions: AISessionItem[];
+}
+
+export interface AIProposedPlan {
+  title: string;
+  description: string;
+  summary: string;
+  available_hours_per_day: number;
+  daily_schedules: AIDaySchedule[];
+}
+
