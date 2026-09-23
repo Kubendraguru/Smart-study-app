@@ -7,13 +7,7 @@ export async function getAnnouncements(): Promise<Announcement[]> {
     const { data, error } = await supabase
       .from('announcements')
       .select(`
-        id,
-        teacher_id,
-        subject_id,
-        title,
-        message,
-        priority,
-        created_at,
+        *,
         subjects (
           subject_name,
           subject_code
@@ -37,14 +31,15 @@ export async function getAnnouncements(): Promise<Announcement[]> {
       const subjectName = item.subjects?.subject_name || 'General';
       const teacherName = item.profiles?.full_name || 'Faculty Member';
       const createdDate = item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : 'Today';
+      const textContent = item.message || item.description || '';
 
       return {
         id: item.id,
         teacher_id: item.teacher_id,
         subject_id: item.subject_id,
         title: item.title,
-        message: item.message,
-        priority: item.priority as 'high' | 'medium' | 'low',
+        message: textContent,
+        priority: (item.priority || 'medium') as 'high' | 'medium' | 'low',
         date: createdDate,
         subject: subjectName,
         subject_name: subjectName,
@@ -74,6 +69,7 @@ export async function createAnnouncement(params: {
     teacher_id: userData.user.id,
     title: params.title.trim(),
     message: params.message.trim(),
+    description: params.message.trim(), // Satisfies NOT NULL constraint if table uses description
     priority: params.priority || 'medium',
   };
 
@@ -85,13 +81,7 @@ export async function createAnnouncement(params: {
     .from('announcements')
     .insert(payload)
     .select(`
-      id,
-      teacher_id,
-      subject_id,
-      title,
-      message,
-      priority,
-      created_at,
+      *,
       subjects (
         subject_name
       )
@@ -108,8 +98,8 @@ export async function createAnnouncement(params: {
     teacher_id: data.teacher_id,
     subject_id: data.subject_id,
     title: data.title,
-    message: data.message,
-    priority: data.priority,
+    message: data.message || data.description || '',
+    priority: data.priority || 'medium',
     date: new Date(data.created_at).toISOString().split('T')[0],
     subject: (data as any).subjects?.subject_name || 'General',
     read: false,
