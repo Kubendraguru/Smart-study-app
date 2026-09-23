@@ -12,11 +12,15 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
-import { GraduationCap, Mail, Lock, User, BookOpen, Building, Hash } from 'lucide-react-native';
+import { GraduationCap, Mail, Lock, User, BookOpen, Building, Hash, CheckSquare, Square } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '@/theme';
 import { signIn, signUp } from '@/service/auth';
 import { supabase } from '@/lib/supabase';
 import type { Role } from '@/types';
+
+const SAVED_EMAIL_KEY = '@smart_study_saved_email';
+const KEEP_SIGNED_IN_KEY = '@smart_study_keep_signed_in';
 
 export default function LoginScreen() {
   const [role, setRole] = useState<Role>('student');
@@ -25,6 +29,7 @@ export default function LoginScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [keepSignedIn, setKeepSignedIn] = useState(true);
 
   // Signup fields
   const [registerNumber, setRegisterNumber] = useState('');
@@ -36,6 +41,25 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Load saved credentials on startup if "Keep me signed in" was enabled
+  React.useEffect(() => {
+    async function loadSavedCredentials() {
+      try {
+        const savedPref = await AsyncStorage.getItem(KEEP_SIGNED_IN_KEY);
+        const savedEmail = await AsyncStorage.getItem(SAVED_EMAIL_KEY);
+        if (savedPref !== 'false' && savedEmail) {
+          setEmail(savedEmail);
+          setKeepSignedIn(true);
+        } else if (savedPref === 'false') {
+          setKeepSignedIn(false);
+        }
+      } catch (err) {
+        console.warn('Could not load saved login credentials:', err);
+      }
+    }
+    loadSavedCredentials();
+  }, []);
+
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
       setError('Please fill in email and password');
@@ -46,6 +70,14 @@ export default function LoginScreen() {
     setError('');
 
     try {
+      if (keepSignedIn) {
+        await AsyncStorage.setItem(SAVED_EMAIL_KEY, email.trim());
+        await AsyncStorage.setItem(KEEP_SIGNED_IN_KEY, 'true');
+      } else {
+        await AsyncStorage.removeItem(SAVED_EMAIL_KEY);
+        await AsyncStorage.setItem(KEEP_SIGNED_IN_KEY, 'false');
+      }
+
       if (isLogin) {
         const { error: signInError } = await signIn(email.trim(), password);
         if (signInError) throw signInError;
@@ -229,6 +261,20 @@ export default function LoginScreen() {
                   />
                 </View>
               </View>
+
+              {/* Keep Me Signed In Checkbox */}
+              {isLogin && (
+                <TouchableOpacity
+                  style={styles.keepSignedInRow}
+                  onPress={() => setKeepSignedIn(!keepSignedIn)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.checkboxBox, keepSignedIn && styles.checkboxBoxActive]}>
+                    {keepSignedIn ? <CheckSquare size={16} color={theme.colors.primary} /> : <Square size={16} color={theme.colors.textMuted} />}
+                  </View>
+                  <Text style={styles.keepSignedInText}>Keep me signed in on this device</Text>
+                </TouchableOpacity>
+              )}
 
               {/* Submit Button */}
               <TouchableOpacity
@@ -414,13 +460,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.text,
   },
+  keepSignedInRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 2,
+    gap: 8,
+  },
+  checkboxBox: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxBoxActive: {},
+  keepSignedInText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
   primaryButton: {
     backgroundColor: theme.colors.primary,
     height: 48,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: 6,
     shadowColor: theme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,

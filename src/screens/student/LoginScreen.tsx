@@ -1,37 +1,65 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { GraduationCap, Mail, Lock, User, BookOpen } from 'lucide-react';
+import { GraduationCap, Mail, Lock, User, BookOpen, CheckSquare, Square } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import type { Role } from '@/types';
 import { signIn, signUp } from "@/service/auth";
 import { supabase } from "@/lib/supabase";
+
+const WEB_SAVED_EMAIL_KEY = 'smart_study_saved_email';
+const WEB_KEEP_SIGNED_IN_KEY = 'smart_study_keep_signed_in';
+
 export default function LoginScreen() {
   const navigate = useNavigate();
-const [role, setRole] = useState<Role>('student');
-const [isLogin, setIsLogin] = useState(true);
+  const [role, setRole] = useState<Role>('student');
+  const [isLogin, setIsLogin] = useState(true);
 
-const [name, setName] = useState('');
-const [email, setEmail] = useState('');
-const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [keepSignedIn, setKeepSignedIn] = useState(true);
 
-// Signup fields
-const [registerNumber, setRegisterNumber] = useState('');
-const [college, setCollege] = useState('');
-const [department, setDepartment] = useState('');
-const [semester, setSemester] = useState('');
+  // Signup fields
+  const [registerNumber, setRegisterNumber] = useState('');
+  const [college, setCollege] = useState('');
+  const [department, setDepartment] = useState('');
+  const [semester, setSemester] = useState('');
 
-// UI states
-const [loading, setLoading] = useState(false);
-const [error, setError] = useState('');
+  // UI states
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    try {
+      const savedPref = localStorage.getItem(WEB_KEEP_SIGNED_IN_KEY);
+      const savedEmail = localStorage.getItem(WEB_SAVED_EMAIL_KEY);
+      if (savedPref !== 'false' && savedEmail) {
+        setEmail(savedEmail);
+        setKeepSignedIn(true);
+      } else if (savedPref === 'false') {
+        setKeepSignedIn(false);
+      }
+    } catch (err) {
+      console.warn('Could not read saved email from localStorage:', err);
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  setLoading(true);
-  setError("");
+    setLoading(true);
+    setError("");
 
-  try {
+    try {
+      if (keepSignedIn) {
+        localStorage.setItem(WEB_SAVED_EMAIL_KEY, email.trim());
+        localStorage.setItem(WEB_KEEP_SIGNED_IN_KEY, 'true');
+      } else {
+        localStorage.removeItem(WEB_SAVED_EMAIL_KEY);
+        localStorage.setItem(WEB_KEEP_SIGNED_IN_KEY, 'false');
+      }
     if (isLogin) {
       // Login
       const { data, error } = await signIn(email, password);
@@ -203,17 +231,26 @@ const [error, setError] = useState('');
               onChange={(e) => setPassword(e.target.value)}
             />
             {isLogin && (
-              <div className="text-right">
-                <button type="button" className="text-xs font-medium text-blue-600 hover:text-blue-700">
+              <div className="flex items-center justify-between text-xs pt-1 pb-1">
+                <label className="flex items-center gap-2 text-gray-600 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={keepSignedIn}
+                    onChange={(e) => setKeepSignedIn(e.target.checked)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
+                  />
+                  <span>Keep me signed in</span>
+                </label>
+                <button type="button" className="font-medium text-blue-600 hover:text-blue-700">
                   Forgot password?
                 </button>
               </div>
             )}
-         {error && (
-  <p className="text-red-500 text-sm">
-    {error}
-  </p>
-)}
+            {error && (
+              <p className="text-red-500 text-sm">
+                {error}
+              </p>
+            )}
 
 <Button
   fullWidth

@@ -14,7 +14,18 @@ const STORAGE_KEYS = {
   HYDRATION_NOTIF_IDS: '@smart_study_hydration_notif_ids',
   EXAM_NOTIF_IDS: '@smart_study_exam_notif_ids',
   TASK_NOTIF_MAP: '@smart_study_task_notif_map',
+  CUSTOM_REMINDERS: '@smart_study_custom_timed_reminders',
 };
+
+export interface CustomTimedReminder {
+  id: string;
+  title: string;
+  body: string;
+  scheduled_date: string;
+  scheduled_time: string;
+  created_at: string;
+  type: 'custom' | 'study_alarm' | 'assignment' | 'exam';
+}
 
 /**
  * Configure global notification behavior when received in foreground
@@ -341,5 +352,138 @@ export async function syncExamReminders(
     );
   } catch (err) {
     console.error('Error synchronizing exam reminders:', err);
+  }
+}
+
+/**
+  * Schedule a custom user-defined notification with explicit date & time
+  */
+export async function scheduleCustomTimedNotification(params: {
+  title: string;
+  body?: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  type?: 'custom' | 'study_alarm' | 'assignment' | 'exam';
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  if (!Notifications || Platform.OS === 'web') {
+    return { success: false, error: 'Phone notifications are only supported on mobile devices.' };
+  }
+
+  try {
+    const hasPermission = await requestNotificationPermissions();
+    if (!hasPermission) {
+      return { success: false, error: 'Notification permissions were denied. Please enable notifications in device settings.' };
+    }
+
+    const [year, month, day] = params.date.split('-').map(Number);
+    const [hours, minutes] = params.time.split(':').map(Number);
+    const triggerDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+
+    if (triggerDate.getTime() <= Date.now()) {
+      return { success: false, error: 'The selected time has already passed. Please choose a future time.' };
+    }
+
+    const notifId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `⏰ ${params.title}`,
+        body: params.body || `It's time for your scheduled study session (${params.time}). Open Smart Study to begin!`,
+        data: { type: params.type || 'custom', scheduledTime: params.time },
+        sound: 'default',
+        channelId: 'study-reminders',
+      },
+      trigger: {
+        type: 'date',
+        date: triggerDate,
+      },
+    });
+
+    // Save reminder in local storage
+    const existingRaw = await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_REMINDERS);
+    const list: CustomTimedReminder[] = existingRaw ? JSON.parse(existingRaw) : [];
+    const newEntry: CustomTimedReminder = {
+      id: notifId,
+      title: params.title,
+      body: params.body || `Scheduled for ${params.time}`,
+      scheduled_date: params.date,
+      scheduled_time: params.time,
+      created_at: new Date().toISOString(),
+      type: params.type || 'custom',
+    };
+    list.unshift(newEntry);
+    await AsyncStorage.setItem(STORAGE_KEYS.CUSTOM_REMINDERS, JSON.stringify(list));
+
+    return { success: true, id: notifId };
+  } catch (err: any) {
+    console.error('Error scheduling custom timed notification:', err);
+    return { success: false, error: err.message || 'Failed to schedule notification.' };
+  }
+}
+
+/**
+  * Retrieve all active custom timed reminders from local storage
+  */
+export async function getCustomTimedReminders(): Promise<CustomTimedReminder[]> {
+  if (Platform.OS === 'web') return [];
+  try {
+    const existingRaw = await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_REMINDERS);
+    if (!existingRaw) return [];
+    return JSON.parse(existingRaw);
+  } catch (err) {
+    console.warn('Error fetching custom timed reminders:', err);
+    return [];
+  }
+}
+
+/**
+  * Delete a specific custom timed reminder
+  */
+export async function deleteCustomTimedReminder(notificationId: string): Promise<boolean> {
+  if (!Notifications || Platform.OS === 'web') return false;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(notificationId).catch(() => {});
+    const existingRaw = await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_REMINDERS);
+    if (existingRaw) {
+      const list: CustomTimedReminder[] = JSON.parse(existingRaw);
+      const updated = list.filter((r) => r.id !== notificationId);
+      await AsyncStorage.setItem(STORAGE_KEYS.CUSTOM_REMINDERS, JSON.stringify(updated));
+    }
+    return true;
+  } catch (err) {
+    console.warn('Error deleting custom reminder:', err);
+    return false;
+  }
+}
+
+/**
+  * Send an immediate test notification to verify device sound and banner
+  */
+export async function sendInstantTestNotification(
+  title: string = '🔔 Smart Study Notification Test',
+  body: string = 'Push notifications and timed alerts are active on your device!'
+): Promise<{ success: boolean; error?: string }> {
+  if (!Notifications || Platform.OS === 'web') {
+    return { success: false, error: 'Phone notifications are only supported on mobile devices.' };
+  }
+
+  try {
+    const hasPermission = await requestNotificationPermissions();
+    if (!hasPermission) {
+      return { success: false, error: 'Please grant notification permissions in your device settings.' };
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: 'default',
+        channelId: 'study-reminders',
+      },
+      trigger: null,
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error sending test notification:', err);
+    return { success: false, error: err.message || 'Failed to send test notification.' };
   }
 }
