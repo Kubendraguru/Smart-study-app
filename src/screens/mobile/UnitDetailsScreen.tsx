@@ -26,6 +26,8 @@ import {
   Clock,
   ListVideo,
   ClipboardList,
+  CheckCircle2,
+  Circle,
 } from 'lucide-react-native';
 import { theme } from '@/theme';
 import AppHeader from '@/components/mobile/AppHeader';
@@ -33,6 +35,7 @@ import { supabase } from '@/lib/supabase';
 import { getVideos, getYoutubeThumbnail } from '@/service/videos';
 import { getAssignments } from '@/service/assignments';
 import { getBooks } from '@/service/books';
+import { isUnitCompleted, toggleUnitCompletion } from '@/service/progress';
 import type { Video, Book, Assignment } from '@/types';
 
 type PdfItem = {
@@ -54,6 +57,8 @@ export default function UnitDetailsScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('pdfs');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [togglingCompletion, setTogglingCompletion] = useState(false);
   const [pdfs, setPdfs] = useState<PdfItem[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const [playlists, setPlaylists] = useState<Video[]>([]);
@@ -65,15 +70,29 @@ export default function UnitDetailsScreen() {
     setLoading(true);
 
     try {
-      // 1. Fetch PDFs from materials
-      const { data: materialsData } = await supabase
+      // 1. Check if unit is marked completed
+      const completedStatusPromise = isUnitCompleted(unitId);
+
+      // 2. Fetch PDFs from materials
+      const materialsPromise = supabase
         .from('materials')
         .select('*')
         .eq('unit_id', unitId)
         .or('material_type.ilike.pdf,file_url.ilike.%.pdf')
         .order('created_at', { ascending: false });
 
-      const formattedPdfs = (materialsData ?? []).map((m: any) => ({
+      // 3. Fetch Single Videos & Playlists & Assignments & Books
+      const [completedStatus, materialsRes, allVids, assigns, bks] = await Promise.all([
+        completedStatusPromise,
+        materialsPromise,
+        getVideos(subjectId, unitId),
+        getAssignments({ subjectId, unitId }),
+        getBooks(subjectId, unitId),
+      ]);
+
+      setIsCompleted(completedStatus);
+
+      const formattedPdfs = (materialsRes.data ?? []).map((m: any) => ({
         id: m.id,
         title: m.title || 'PDF Document',
         url: m.file_url,
@@ -81,13 +100,6 @@ export default function UnitDetailsScreen() {
         created_at: m.created_at,
       }));
       setPdfs(formattedPdfs);
-
-      // 2. Fetch Single Videos & Playlists
-      const [allVids, assigns, bks] = await Promise.all([
-        getVideos(subjectId, unitId),
-        getAssignments({ subjectId, unitId }),
-        getBooks(subjectId, unitId),
-      ]);
 
       const singleVideos = allVids.filter((v) => !v.is_playlist && v.video_type !== 'playlist');
       const playlistVideos = allVids.filter((v) => v.is_playlist || v.video_type === 'playlist');
@@ -103,6 +115,19 @@ export default function UnitDetailsScreen() {
       setRefreshing(false);
     }
   }, [unitId, subjectId]);
+
+  const handleToggleCompletion = async () => {
+    if (!unitId || togglingCompletion) return;
+    const nextState = !isCompleted;
+    setIsCompleted(nextState); // Optimistic UI update
+    setTogglingCompletion(true);
+    const res = await toggleUnitCompletion(unitId, nextState);
+    if (!res.success) {
+      // Revert if error
+      setIsCompleted(!nextState);
+    }
+    setTogglingCompletion(false);
+  };
 
   useEffect(() => {
     loadUnitContent();
@@ -147,11 +172,36 @@ export default function UnitDetailsScreen() {
       >
         {/* Unit Info Box */}
         <View style={styles.unitHeaderCard}>
-          <View style={styles.badgeRow}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Unit {unitNumber}</Text>
+          <View style={styles.unitHeaderTopRow}>
+            <View style={styles.badgeRow}>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>Unit {unitNumber}</Text>
+              </View>
+              <Text style={styles.subjectSubText}>{subjectName}</Text>
             </View>
-            <Text style={styles.subjectSubText}>{subjectName}</Text>
+
+            {/* Toggle Completion Button */}
+            <TouchableOpacity
+              style={[
+                styles.completionToggleBtn,
+                isCompleted ? styles.completionToggleBtnDone : styles.completionToggleBtnPending,
+              ]}
+              onPress={handleToggleCompletion}
+              disabled={togglingCompletion}
+              activeOpacity={0.75}
+            >
+              {isCompleted ? (
+                <>
+                  <CheckCircle2 size={15} color="#059669" />
+                  <Text style={styles.completionToggleTextDone}>Completed</Text>
+                </>
+              ) : (
+                <>
+                  <Circle size={15} color={theme.colors.textMuted} />
+                  <Text style={styles.completionToggleTextPending}>Mark as Completed</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
           <Text style={styles.unitTitleText}>{unitTitle}</Text>
         </View>
@@ -497,11 +547,17 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  unitHeaderTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
+    flex: 1,
   },
   badge: {
     backgroundColor: theme.colors.primaryLight,
@@ -517,6 +573,33 @@ const styles = StyleSheet.create({
   subjectSubText: {
     fontSize: 12,
     color: theme.colors.textMuted,
+  },
+  completionToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  completionToggleBtnDone: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  completionToggleBtnPending: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  completionToggleTextDone: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  completionToggleTextPending: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
   },
   unitTitleText: {
     fontSize: 17,

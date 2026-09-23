@@ -11,6 +11,8 @@ import {
   Clock,
   ExternalLink,
   Sparkles,
+  CheckCircle2,
+  Circle,
 } from 'lucide-react';
 
 import PageContainer from '@/components/layout/PageContainer';
@@ -23,6 +25,7 @@ import { supabase } from '@/lib/supabase';
 import { getVideos } from '@/service/videos';
 import { getAssignments } from '@/service/assignments';
 import { getBooks } from '@/service/books';
+import { isUnitCompleted, toggleUnitCompletion } from '@/service/progress';
 import type { Video as VideoType, Book, Assignment } from '@/types';
 
 type Tab = 'pdfs' | 'videos' | 'playlists' | 'assignments' | 'books';
@@ -49,6 +52,7 @@ export default function UnitDetailsScreen() {
   const [playlists, setPlaylists] = useState<VideoType[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
+  const [togglingCompletion, setTogglingCompletion] = useState(false);
 
   useEffect(() => {
     loadUnit();
@@ -63,15 +67,16 @@ export default function UnitDetailsScreen() {
     setLoading(true);
 
     try {
-      // 1. Fetch Unit Info
-      const { data: unitData, error: unitError } = await supabase
-        .from('units')
-        .select('*')
-        .eq('id', unitId)
-        .single();
+      // 1. Fetch Unit Info & Completed state in parallel
+      const [unitRes, isDone] = await Promise.all([
+        supabase.from('units').select('*').eq('id', unitId).single(),
+        isUnitCompleted(unitId),
+      ]);
 
-      if (unitError || !unitData) {
-        console.error('Error loading unit:', unitError);
+      const unitData = unitRes.data;
+
+      if (unitRes.error || !unitData) {
+        console.error('Error loading unit:', unitRes.error);
         setUnit(null);
         return;
       }
@@ -82,7 +87,7 @@ export default function UnitDetailsScreen() {
         unit_number: unitData.unit_number,
         title: unitData.unit_title ?? unitData.title ?? `Unit ${unitData.unit_number}`,
         description: unitData.description ?? '',
-        completed: unitData.completed ?? false,
+        completed: isDone,
       });
 
       // 2. Fetch PDFs from materials
@@ -127,6 +132,19 @@ export default function UnitDetailsScreen() {
       setLoading(false);
     }
   }
+
+  const handleToggleCompletion = async () => {
+    if (!unit || togglingCompletion) return;
+    const nextState = !unit.completed;
+    setUnit((prev) => (prev ? { ...prev, completed: nextState } : null));
+    setTogglingCompletion(true);
+    const res = await toggleUnitCompletion(unit.id, nextState);
+    if (!res.success) {
+      // Revert state if failed
+      setUnit((prev) => (prev ? { ...prev, completed: !nextState } : null));
+    }
+    setTogglingCompletion(false);
+  };
 
   if (loading) {
     return (
@@ -186,9 +204,34 @@ export default function UnitDetailsScreen() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-5"
           >
-            <div className="flex items-center gap-2 mb-2">
-              <Badge color="blue">Unit {unit.unit_number}</Badge>
-              {unit.completed && <Badge color="green">Completed</Badge>}
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2">
+                <Badge color="blue">Unit {unit.unit_number}</Badge>
+                {unit.completed && <Badge color="green">Completed ✓</Badge>}
+              </div>
+
+              {/* Mark Completed Toggle Button */}
+              <button
+                onClick={handleToggleCompletion}
+                disabled={togglingCompletion}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                  unit.completed
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                {unit.completed ? (
+                  <>
+                    <CheckCircle2 size={14} className="text-emerald-600" />
+                    <span>Completed</span>
+                  </>
+                ) : (
+                  <>
+                    <Circle size={14} className="text-gray-400" />
+                    <span>Mark as Completed</span>
+                  </>
+                )}
+              </button>
             </div>
 
             <h2 className="text-lg font-bold text-gray-900 mb-1">{unit.title}</h2>

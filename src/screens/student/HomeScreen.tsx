@@ -20,12 +20,9 @@ import Avatar from '@/components/ui/Avatar';
 import { notifications } from '@/data/notifications';
 import { signOut } from '@/service/auth';
 import { supabase } from '@/lib/supabase';
-import type { Subject } from '@/types';
+import type { Subject, StudentOverallProgress } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-
-
-
-
+import { getStudentOverallProgress } from '@/service/progress';
 
 type SupabaseSubject = {
   id: string;
@@ -37,12 +34,13 @@ type SupabaseSubject = {
   description: string | null;
 };
 export default function HomeScreen() {
-    const { user } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [search, setSearch] = useState('');
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [overallProgress, setOverallProgress] = useState<StudentOverallProgress | null>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -154,6 +152,10 @@ async function loadSubjects() {
       ...formattedCurrentSubjects,
       ...formattedArrears,
     ]);
+
+    // Fetch live overall progress
+    const prog = await getStudentOverallProgress(user.id);
+    setOverallProgress(prog);
   } catch (error) {
     console.error('Unexpected error:', error);
   } finally {
@@ -249,37 +251,49 @@ const recentlyViewed = currentSubjects.slice(0, 3);
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-5 mb-6 shadow-lg shadow-blue-600/20"
+            onClick={() => navigate('/progress')}
+            className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-5 mb-6 shadow-lg shadow-blue-600/20 cursor-pointer hover:shadow-xl hover:scale-[1.01] transition-all"
           >
-            <div className="flex items-center gap-2 mb-1">
-              <GraduationCap size={18} className="text-white" />
-
-              <span className="text-xs font-medium text-blue-100">
-                Semester 5
-              </span>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <GraduationCap size={18} className="text-white" />
+                <span className="text-xs font-medium text-blue-100">
+                  Academic Progress
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-xs font-bold text-blue-100 hover:text-white">
+                <span>View Details</span>
+                <ChevronRight size={14} />
+              </div>
             </div>
 
             <h2 className="text-lg font-bold text-white mb-3">
-              Your Progress
+              Your Learning Overview
             </h2>
 
             <div className="flex items-end gap-4">
               <div>
                 <p className="text-3xl font-bold text-white">
-                  38%
+                  {overallProgress?.overallPercentage ?? 0}%
                 </p>
-
                 <p className="text-xs text-blue-100">
                   Overall completion
                 </p>
               </div>
 
-              <div className="flex-1 flex justify-end">
+              <div className="flex-1 flex justify-end gap-5">
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-white">
-                    {loading ? '...' : subjects.length}
+                  <p className="text-xl font-bold text-white">
+                    {overallProgress?.completedUnits ?? 0} / {overallProgress?.totalUnits ?? 0}
                   </p>
-
+                  <p className="text-xs text-blue-100">
+                    Completed Units
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-white">
+                    {loading ? '...' : (overallProgress?.totalSubjects || subjects.length)}
+                  </p>
                   <p className="text-xs text-blue-100">
                     Subjects
                   </p>

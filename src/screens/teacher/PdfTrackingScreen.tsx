@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText,
   Users,
@@ -11,15 +11,23 @@ import {
   AlertCircle,
   Eye,
   RefreshCw,
+  GraduationCap,
+  Layers,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import PageContainer from '@/components/layout/PageContainer';
 import AppHeader from '@/components/layout/AppHeader';
 import TeacherBottomNav from '@/components/layout/TeacherBottomNav';
 import Badge from '@/components/ui/Badge';
 import { getAllTeacherPdfs, getPdfViewTracking } from '@/service/tracking';
-import type { PdfTrackingStats } from '@/types';
+import { getTeacherCohortProgress } from '@/service/progress';
+import { getSubjects } from '@/service/subject';
+import type { PdfTrackingStats, TeacherCohortProgress, Subject } from '@/types';
 
+type ScreenMode = 'progress' | 'pdf';
 type Tab = 'viewed' | 'notViewed';
+type ProgressFilter = 'all' | 'incomplete' | 'completed';
 
 export default function PdfTrackingScreen() {
   const { pdfId: routePdfId } = useParams<{ pdfId: string }>();
@@ -28,54 +36,93 @@ export default function PdfTrackingScreen() {
 
   const selectedPdfId = routePdfId || searchParams.get('pdfId') || '';
 
+  const [screenMode, setScreenMode] = useState<ScreenMode>('progress');
+
+  // PDF Tracking
   const [pdfs, setPdfs] = useState<
     { id: string; title: string; subjectName: string; unitTitle: string; createdAt: string }[]
   >([]);
   const [activePdfId, setActivePdfId] = useState<string>(selectedPdfId);
   const [trackingStats, setTrackingStats] = useState<PdfTrackingStats | null>(null);
+  const [tab, setTab] = useState<Tab>('viewed');
+
+  // Unit Progress Tracking
+  const [subjectsList, setSubjectsList] = useState<Subject[]>([]);
+  const [activeSubjectId, setActiveSubjectId] = useState<string>('');
+  const [cohortProgress, setCohortProgress] = useState<TeacherCohortProgress | null>(null);
+  const [progressFilter, setProgressFilter] = useState<ProgressFilter>('all');
+  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [tab, setTab] = useState<Tab>('viewed');
   const [searchTerm, setSearchTerm] = useState('');
-  const [tableMissing, setTableMissing] = useState(false);
 
   useEffect(() => {
-    loadPdfsList();
+    loadInitialData();
   }, []);
 
   useEffect(() => {
-    if (activePdfId) {
-      loadStats(activePdfId);
+    if (activePdfId && screenMode === 'pdf') {
+      loadPdfStats(activePdfId);
     }
-  }, [activePdfId]);
+  }, [activePdfId, screenMode]);
 
-  async function loadPdfsList() {
+  useEffect(() => {
+    if (activeSubjectId && screenMode === 'progress') {
+      loadCohortStats(activeSubjectId);
+    }
+  }, [activeSubjectId, screenMode]);
+
+  async function loadInitialData() {
     setLoading(true);
-    const list = await getAllTeacherPdfs();
-    setPdfs(list);
+    const [pdfList, subjs] = await Promise.all([
+      getAllTeacherPdfs(),
+      getSubjects(),
+    ]);
 
-    if (list.length > 0) {
-      const initialId = selectedPdfId && list.some((p) => p.id === selectedPdfId)
+    setPdfs(pdfList);
+    setSubjectsList(subjs || []);
+
+    if (pdfList.length > 0) {
+      const initialId = selectedPdfId && pdfList.some((p) => p.id === selectedPdfId)
         ? selectedPdfId
-        : list[0].id;
+        : pdfList[0].id;
       setActivePdfId(initialId);
-    } else {
-      setLoading(false);
     }
+
+    if (subjs && subjs.length > 0) {
+      setActiveSubjectId(subjs[0].id);
+    }
+
+    setLoading(false);
   }
 
-  async function loadStats(pdfId: string) {
+  async function loadPdfStats(pdfId: string) {
     setRefreshing(true);
     const result = await getPdfViewTracking(pdfId);
     setTrackingStats(result.stats);
-    setTableMissing(Boolean(result.tableMissing));
-    setLoading(false);
+    setRefreshing(false);
+  }
+
+  async function loadCohortStats(subjectId: string) {
+    if (!subjectId) return;
+    setRefreshing(true);
+    const result = await getTeacherCohortProgress(subjectId);
+    setCohortProgress(result);
     setRefreshing(false);
   }
 
   const handleSelectPdf = (id: string) => {
     setActivePdfId(id);
     setSearchParams({ pdfId: id });
+  };
+
+  const handleRefresh = () => {
+    if (screenMode === 'pdf' && activePdfId) {
+      loadPdfStats(activePdfId);
+    } else if (screenMode === 'progress' && activeSubjectId) {
+      loadCohortStats(activeSubjectId);
+    }
   };
 
   const filteredViewed = (trackingStats?.viewedStudents ?? []).filter((s) =>
@@ -85,6 +132,14 @@ export default function PdfTrackingScreen() {
   const filteredNotViewed = (trackingStats?.notViewedStudents ?? []).filter((s) =>
     `${s.studentName} ${s.registerNumber}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const filteredStudents = (cohortProgress?.students ?? []).filter((s) => {
+    const matches = `${s.studentName} ${s.registerNumber}`.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!matches) return false;
+    if (progressFilter === 'completed') return s.percentage === 100;
+    if (progressFilter === 'incomplete') return s.percentage < 100;
+    return true;
+  });
 
   const formatViewedTime = (isoString?: string) => {
     if (!isoString) return 'Viewed';
@@ -101,292 +156,459 @@ export default function PdfTrackingScreen() {
     }
   };
 
+  const getProgressColor = (percentage: number) => {
+    if (percentage >= 80) return 'text-emerald-600 bg-emerald-500';
+    if (percentage >= 40) return 'text-blue-600 bg-blue-600';
+    return 'text-amber-600 bg-amber-500';
+  };
+
   return (
     <>
       <AppHeader
-        title="PDF View Tracking"
+        title="Student Tracking & Analytics"
         showBack
         rightAction={
           <button
-            onClick={() => activePdfId && loadStats(activePdfId)}
-            disabled={refreshing || !activePdfId}
-            className="p-2 rounded-xl text-gray-500 hover:bg-gray-50 disabled:opacity-40"
-            title="Refresh"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="p-2 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors"
           >
-            <RefreshCw size={18} className={refreshing ? 'animate-spin text-blue-600' : ''} />
+            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
           </button>
         }
       />
 
       <PageContainer showBottomNav>
-        <div className="pt-4 space-y-4">
-          {/* PDF Selector Dropdown / Pills */}
-          {pdfs.length > 0 && (
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">
-                Select PDF Material
-              </label>
-              <select
-                value={activePdfId}
-                onChange={(e) => handleSelectPdf(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-4 text-sm text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm shadow-gray-200/40"
-              >
-                {pdfs.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title} ({p.subjectName} - {p.unitTitle})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        <div className="pt-4 max-w-2xl mx-auto space-y-5">
+          {/* Mode Switch Tabs */}
+          <div className="flex bg-gray-100 p-1 rounded-2xl gap-1">
+            <button
+              onClick={() => setScreenMode('progress')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                screenMode === 'progress'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <GraduationCap size={16} />
+              <span>Unit Progress Analytics</span>
+            </button>
 
-          {/* Database Setup Notice if table missing */}
-          {tableMissing && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-900 text-xs">
-              <div className="flex items-start gap-2.5">
-                <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-semibold text-sm mb-1 text-amber-900">Database Setup Required</h4>
-                  <p className="text-amber-800 leading-relaxed mb-2">
-                    The <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">pdf_views</code> table is not
-                    created in your Supabase project yet.
-                  </p>
-                  <p className="text-amber-700 leading-relaxed">
-                    Execute the migration file at{' '}
-                    <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">
-                      supabase/migrations/20260922_pdf_views.sql
-                    </code>{' '}
-                    in your Supabase SQL editor.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+            <button
+              onClick={() => setScreenMode('pdf')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                screenMode === 'pdf'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <FileText size={16} />
+              <span>PDF View Tracking</span>
+            </button>
+          </div>
 
-          {loading ? (
-            <div className="py-20 text-center">
-              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-sm font-medium text-gray-500">Loading tracking data...</p>
-            </div>
-          ) : !trackingStats ? (
-            <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm shadow-gray-200/60">
-              <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
-                <FileText size={24} className="text-gray-400" />
-              </div>
-              <h3 className="font-semibold text-gray-900 text-sm mb-1">No PDFs uploaded yet</h3>
-              <p className="text-xs text-gray-500 mb-4">
-                Upload course materials to view student reading engagement and attendance.
-              </p>
-              <button
-                onClick={() => navigate('/teacher/upload-pdf')}
-                className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition"
-              >
-                Upload PDF
-              </button>
-            </div>
-          ) : (
+          {/* ========================================================= */}
+          {/* MODE: UNIT PROGRESS                                       */}
+          {/* ========================================================= */}
+          {screenMode === 'progress' && (
             <>
-              {/* Header Overview Card */}
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-2xl p-5 shadow-sm shadow-gray-200/60 border border-gray-100"
-              >
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold text-blue-600">
-                        {trackingStats.subjectName}
-                      </span>
-                      <span>·</span>
-                      <span className="text-xs text-gray-500">{trackingStats.unitTitle}</span>
-                    </div>
-                    <h2 className="text-base font-bold text-gray-900 truncate">
-                      {trackingStats.pdfTitle}
-                    </h2>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
-                    <FileText size={20} className="text-red-500" />
-                  </div>
-                </div>
+              {/* Subject Selector Dropdown */}
+              <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                  Select Subject to Monitor
+                </label>
+                <select
+                  value={activeSubjectId}
+                  onChange={(e) => setActiveSubjectId(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {subjectsList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.code} - {s.name} (Sem {s.semester})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                {/* Progress bar */}
-                <div className="space-y-1.5 pt-2 border-t border-gray-100">
-                  <div className="flex justify-between text-xs">
-                    <span className="font-medium text-gray-600">Student Completion</span>
-                    <span className="font-bold text-blue-600">{trackingStats.viewedPercentage}%</span>
+              {loading ? (
+                <div className="py-20 text-center">
+                  <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                  <p className="text-xs text-gray-400">Loading progress data...</p>
+                </div>
+              ) : !cohortProgress ? (
+                <div className="bg-white rounded-2xl p-8 text-center border border-gray-100">
+                  <GraduationCap size={36} className="text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-gray-800">No Cohort Data</p>
+                  <p className="text-xs text-gray-400 mt-1">Select a subject above to view student completion rates.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Cohort Overview Card */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white shadow-xl shadow-blue-600/20"
+                  >
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <div>
+                        <span className="text-xs font-bold text-blue-200 uppercase tracking-wider">
+                          {cohortProgress.subjectCode} • Sem {cohortProgress.semester}
+                        </span>
+                        <h2 className="text-lg font-black mt-0.5">{cohortProgress.subjectName}</h2>
+                      </div>
+                      <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex flex-col items-center justify-center">
+                        <span className="text-lg font-black">{cohortProgress.averagePercentage}%</span>
+                        <span className="text-[9px] text-blue-100 font-semibold">Class Avg</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 border-t border-white/15 pt-4">
+                      <div>
+                        <p className="text-xl font-black">{cohortProgress.totalStudents}</p>
+                        <p className="text-[11px] text-blue-100">Enrolled Students</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-black">{cohortProgress.totalUnits}</p>
+                        <p className="text-[11px] text-blue-100">Units in Subject</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-black">{cohortProgress.fullyCompletedStudentsCount}</p>
+                        <p className="text-[11px] text-blue-100">100% Finished</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Filter chips & Search */}
+                  <div className="flex flex-wrap gap-2 items-center justify-between">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setProgressFilter('all')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          progressFilter === 'all'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-white text-gray-600 border border-gray-200'
+                        }`}
+                      >
+                        All ({cohortProgress.students.length})
+                      </button>
+                      <button
+                        onClick={() => setProgressFilter('incomplete')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          progressFilter === 'incomplete'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-white text-gray-600 border border-gray-200'
+                        }`}
+                      >
+                        In Progress ({cohortProgress.students.filter((s) => s.percentage < 100).length})
+                      </button>
+                      <button
+                        onClick={() => setProgressFilter('completed')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          progressFilter === 'completed'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-white text-gray-600 border border-gray-200'
+                        }`}
+                      >
+                        Completed ({cohortProgress.fullyCompletedStudentsCount})
+                      </button>
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                    <div
-                      className="bg-blue-600 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${trackingStats.viewedPercentage}%` }}
+
+                  {/* Search input */}
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Search by student name or register no..."
+                      className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     />
                   </div>
-                </div>
 
-                {/* Stat Metric Grid */}
-                <div className="grid grid-cols-3 gap-2.5 mt-4 pt-4 border-t border-gray-100">
-                  <div className="bg-gray-50 rounded-xl p-3 text-center">
-                    <p className="text-[11px] font-medium text-gray-500 mb-0.5">Total</p>
-                    <p className="text-lg font-bold text-gray-900">{trackingStats.totalStudents}</p>
-                    <p className="text-[10px] text-gray-400">Enrolled</p>
-                  </div>
+                  {/* Student Cards List */}
+                  <div className="space-y-3">
+                    {filteredStudents.length === 0 ? (
+                      <div className="bg-white rounded-2xl p-8 text-center border border-gray-100">
+                        <p className="text-xs text-gray-400">No students match your filter.</p>
+                      </div>
+                    ) : (
+                      filteredStudents.map((student) => {
+                        const isExpanded = expandedStudentId === student.studentId;
+                        const colorClasses = getProgressColor(student.percentage);
 
-                  <div className="bg-emerald-50 rounded-xl p-3 text-center">
-                    <p className="text-[11px] font-medium text-emerald-700 mb-0.5">Viewed</p>
-                    <p className="text-lg font-bold text-emerald-600">{trackingStats.viewedCount}</p>
-                    <p className="text-[10px] text-emerald-600/80">Students</p>
-                  </div>
+                        return (
+                          <div
+                            key={student.studentId}
+                            className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+                          >
+                            <button
+                              onClick={() => setExpandedStudentId(isExpanded ? null : student.studentId)}
+                              className="w-full p-4 text-left flex items-start justify-between gap-3 hover:bg-gray-50/50 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1">
+                                  <h4 className="text-sm font-bold text-gray-900 truncate">{student.studentName}</h4>
+                                  <span className={`text-xs font-black ${colorClasses.split(' ')[0]}`}>
+                                    {student.percentage}%
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-gray-400 mb-2 font-medium">
+                                  Reg: {student.registerNumber} • Sem {student.semester}
+                                </p>
 
-                  <div className="bg-amber-50 rounded-xl p-3 text-center">
-                    <p className="text-[11px] font-medium text-amber-700 mb-0.5">Not Viewed</p>
-                    <p className="text-lg font-bold text-amber-600">{trackingStats.notViewedCount}</p>
-                    <p className="text-[10px] text-amber-600/80">Pending</p>
-                  </div>
-                </div>
-              </motion.div>
+                                {/* Progress Bar */}
+                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-1.5">
+                                  <div
+                                    className={`h-full rounded-full ${colorClasses.split(' ')[1]}`}
+                                    style={{ width: `${Math.min(100, Math.max(0, student.percentage))}%` }}
+                                  />
+                                </div>
 
-              {/* Search Bar */}
-              <div className="relative">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search student by name or register number..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-2xl py-2.5 pl-10 pr-4 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm shadow-gray-200/30"
-                />
-              </div>
+                                <p className="text-[11px] text-gray-500 font-medium">
+                                  Completed {student.completedUnits} of {student.totalUnits} units
+                                  {student.remainingUnits > 0 ? ` (${student.remainingUnits} incomplete)` : ' ✓'}
+                                </p>
+                              </div>
 
-              {/* Tabs */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setTab('viewed')}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                    tab === 'viewed'
-                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                      : 'bg-white text-gray-600 border border-gray-200'
-                  }`}
-                >
-                  <CheckCircle2 size={14} />
-                  Viewed ({filteredViewed.length})
-                </button>
+                              <div className="p-1 text-gray-400 mt-1">
+                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              </div>
+                            </button>
 
-                <button
-                  onClick={() => setTab('notViewed')}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                    tab === 'notViewed'
-                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                      : 'bg-white text-gray-600 border border-gray-200'
-                  }`}
-                >
-                  <Clock size={14} />
-                  Not Viewed ({filteredNotViewed.length})
-                </button>
-              </div>
+                            {/* Expanded Unit Lists */}
+                            <AnimatePresence>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  className="border-t border-gray-100 bg-gray-50/50 px-4 py-3 space-y-3"
+                                >
+                                  {/* Incomplete Units */}
+                                  {student.incompleteUnits.length > 0 && (
+                                    <div>
+                                      <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wider mb-1.5">
+                                        Incomplete Units ({student.incompleteUnits.length})
+                                      </p>
+                                      <div className="space-y-1">
+                                        {student.incompleteUnits.map((u) => (
+                                          <div
+                                            key={u.id}
+                                            className="flex items-center gap-2 text-xs text-gray-700 bg-white p-2 rounded-lg border border-amber-200/60"
+                                          >
+                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                            <span className="font-semibold text-gray-500">Unit {u.unitNumber}:</span>
+                                            <span className="truncate">{u.title}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
 
-              {/* Student Lists */}
-              {tab === 'viewed' && (
-                <div className="space-y-2.5">
-                  {filteredViewed.length === 0 ? (
-                    <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm">
-                      <p className="text-sm font-semibold text-gray-700">
-                        {searchTerm
-                          ? 'No students found'
-                          : trackingStats.totalStudents === 0
-                          ? 'No students enrolled yet'
-                          : 'No views recorded yet'}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {searchTerm
-                          ? 'No student matches your search query.'
-                          : trackingStats.totalStudents === 0
-                          ? 'Students registered for this department and semester will appear here.'
-                          : 'No students have opened this PDF yet.'}
-                      </p>
-                    </div>
-                  ) : (
-                    filteredViewed.map((s, idx) => (
-                      <motion.div
-                        key={s.studentId}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.02 }}
-                        className="bg-white rounded-2xl p-3.5 shadow-sm shadow-gray-200/50 border border-gray-100 flex items-center justify-between gap-3"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 font-bold text-xs flex items-center justify-center flex-shrink-0">
-                            {s.studentName.slice(0, 2).toUpperCase()}
+                                  {/* Completed Units */}
+                                  {student.completedUnitsList.length > 0 && (
+                                    <div>
+                                      <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider mb-1.5">
+                                        Completed Units ({student.completedUnitsList.length})
+                                      </p>
+                                      <div className="space-y-1">
+                                        {student.completedUnitsList.map((u) => (
+                                          <div
+                                            key={u.id}
+                                            className="flex items-center gap-2 text-xs text-emerald-800 bg-white p-2 rounded-lg border border-emerald-200/60"
+                                          >
+                                            <CheckCircle2 size={13} className="text-emerald-600 flex-shrink-0" />
+                                            <span className="font-semibold text-emerald-600">Unit {u.unitNumber}:</span>
+                                            <span className="truncate">{u.title}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-bold text-gray-900 truncate">{s.studentName}</h4>
-                            <p className="text-[11px] text-gray-400">Reg: {s.registerNumber}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col items-end flex-shrink-0">
-                          <Badge color="green">Viewed</Badge>
-                          <span className="text-[10px] text-gray-400 mt-1">
-                            {formatViewedTime(s.viewedAt)}
-                          </span>
-                        </div>
-                      </motion.div>
-                    ))
-                  )}
-                </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
               )}
+            </>
+          )}
 
-              {tab === 'notViewed' && (
-                <div className="space-y-2.5">
-                  {filteredNotViewed.length === 0 ? (
-                    <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm">
-                      <p className="text-sm font-semibold text-gray-700">
-                        {searchTerm
-                          ? 'No students found'
-                          : trackingStats.totalStudents === 0
-                          ? 'No students enrolled yet'
-                          : 'All caught up!'}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {searchTerm
-                          ? 'No student matches your search query.'
-                          : trackingStats.totalStudents === 0
-                          ? 'Students registered for this department and semester will appear here.'
-                          : 'All enrolled students have viewed this PDF!'}
-                      </p>
-                    </div>
-                  ) : (
-                    filteredNotViewed.map((s, idx) => (
-                      <motion.div
-                        key={s.studentId}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.02 }}
-                        className="bg-white rounded-2xl p-3.5 shadow-sm shadow-gray-200/50 border border-gray-100 flex items-center justify-between gap-3"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-600 font-bold text-xs flex items-center justify-center flex-shrink-0">
-                            {s.studentName.slice(0, 2).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-bold text-gray-900 truncate">{s.studentName}</h4>
-                            <p className="text-[11px] text-gray-400">Reg: {s.registerNumber}</p>
-                          </div>
-                        </div>
+          {/* ========================================================= */}
+          {/* MODE: PDF VIEW TRACKING                                   */}
+          {/* ========================================================= */}
+          {screenMode === 'pdf' && (
+            <>
+              {/* PDF Selector Dropdown */}
+              <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                  Select Uploaded PDF
+                </label>
+                <select
+                  value={activePdfId}
+                  onChange={(e) => handleSelectPdf(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {pdfs.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title} ({p.subjectName} • {p.unitTitle})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                        <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-[10px] font-semibold flex-shrink-0">
-                          Not Viewed
-                        </span>
-                      </motion.div>
-                    ))
-                  )}
+              {!trackingStats ? (
+                <div className="bg-white rounded-2xl p-8 text-center border border-gray-100">
+                  <FileText size={36} className="text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-gray-800">No PDF selected</p>
                 </div>
+              ) : (
+                <>
+                  {/* Overview Stats Card */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white shadow-xl shadow-blue-600/20"
+                  >
+                    <span className="text-xs font-bold text-blue-200 uppercase tracking-wider">
+                      {trackingStats.subjectName} • {trackingStats.unitTitle}
+                    </span>
+                    <h2 className="text-lg font-black mt-0.5 mb-3">{trackingStats.pdfTitle}</h2>
+
+                    {/* Progress Bar */}
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="flex-1 h-2.5 bg-white/20 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, Math.max(0, trackingStats.viewedPercentage))}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-black text-white">{trackingStats.viewedPercentage}%</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 border-t border-white/15 pt-3">
+                      <div>
+                        <p className="text-xl font-black">{trackingStats.totalStudents}</p>
+                        <p className="text-[11px] text-blue-100">Total Students</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-black text-emerald-300">{trackingStats.viewedCount}</p>
+                        <p className="text-[11px] text-blue-100">Opened</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-black text-rose-300">{trackingStats.notViewedCount}</p>
+                        <p className="text-[11px] text-blue-100">Not Opened</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Tabs: Viewed vs Not Viewed */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setTab('viewed')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border transition-all ${
+                        tab === 'viewed'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-sm'
+                          : 'bg-white text-gray-600 border-gray-200'
+                      }`}
+                    >
+                      <CheckCircle2 size={15} />
+                      <span>Viewed ({trackingStats.viewedCount})</span>
+                    </button>
+                    <button
+                      onClick={() => setTab('notViewed')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border transition-all ${
+                        tab === 'notViewed'
+                          ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-sm'
+                          : 'bg-white text-gray-600 border-gray-200'
+                      }`}
+                    >
+                      <Clock size={15} />
+                      <span>Not Viewed ({trackingStats.notViewedCount})</span>
+                    </button>
+                  </div>
+
+                  {/* Search */}
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Search student or register no..."
+                      className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* Students List */}
+                  <div className="space-y-2">
+                    {tab === 'viewed' && (
+                      filteredViewed.length === 0 ? (
+                        <div className="bg-white rounded-2xl p-6 text-center border border-gray-100">
+                          <p className="text-xs text-gray-400">No students found.</p>
+                        </div>
+                      ) : (
+                        filteredViewed.map((s) => (
+                          <div
+                            key={s.studentId}
+                            className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                                {s.studentName ? s.studentName.charAt(0).toUpperCase() : 'S'}
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-gray-900">{s.studentName}</p>
+                                <p className="text-[11px] text-gray-400">{s.registerNumber}</p>
+                              </div>
+                            </div>
+                            <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                              {formatViewedTime(s.viewedAt)}
+                            </span>
+                          </div>
+                        ))
+                      )
+                    )}
+
+                    {tab === 'notViewed' && (
+                      filteredNotViewed.length === 0 ? (
+                        <div className="bg-white rounded-2xl p-6 text-center border border-gray-100">
+                          <p className="text-xs text-gray-400">All students have opened this document! 🎉</p>
+                        </div>
+                      ) : (
+                        filteredNotViewed.map((s) => (
+                          <div
+                            key={s.studentId}
+                            className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-xs">
+                                {s.studentName ? s.studentName.charAt(0).toUpperCase() : 'S'}
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-gray-900">{s.studentName}</p>
+                                <p className="text-[11px] text-gray-400">{s.registerNumber}</p>
+                              </div>
+                            </div>
+                            <span className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 text-[10px] font-bold">
+                              Pending
+                            </span>
+                          </div>
+                        ))
+                      )
+                    )}
+                  </div>
+                </>
               )}
             </>
           )}
         </div>
       </PageContainer>
-
       <TeacherBottomNav />
     </>
   );

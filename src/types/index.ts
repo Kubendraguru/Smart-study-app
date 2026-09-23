@@ -273,3 +273,77 @@ export interface AIProposedPlan {
   daily_schedules: AIDaySchedule[];
 }
 
+export interface StudentUnitProgress {
+  id?: string;
+  student_id: string;
+  unit_id: string;
+  completed: boolean;
+  completed_at?: string;
+  created_at?: string;
+}
+
+export interface UnitProgressItem {
+  id: string;
+  unitNumber: number;
+  title: string;
+  description?: string | null;
+  completed: boolean;
+  completedAt?: string | null;
+  pdfCount?: number;
+  videoCount?: number;
+  assignmentCount?: number;
+}
+
+export interface SubjectProgressSummary {
+  subjectId: string;
+  subjectCode: string;
+  subjectName: string;
+  semester: number;
+  department: string;
+  isArrear?: boolean;
+  totalUnits: number;
+  completedUnits: number;
+  remainingUnits: number;
+  percentage: number;
+  units: UnitProgressItem[];
+}
+
+export interface StudentOverallProgress {
+  studentId: string;
+  totalSubjects: number;
+  totalUnits: number;
+  completedUnits: number;
+  remainingUnits: number;
+  overallPercentage: number;
+  pdfViewsCount: number;
+  subjects: SubjectProgressSummary[];
+}
+
+export interface CohortStudentProgress {
+  studentId: string;
+  studentName: string;
+  registerNumber: string;
+  department?: string;
+  semester?: number;
+  totalUnits: number;
+  completedUnits: number;
+  remainingUnits: number;
+  percentage: number;
+  incompleteUnits: { id: string; unitNumber: number; title: string }[];
+  completedUnitsList: { id: string; unitNumber: number; title: string; completedAt?: string }[];
+}
+
+export interface TeacherCohortProgress {
+  subjectId: string;
+  subjectCode: string;
+  subjectName: string;
+  semester: number;
+  department: string;
+  totalUnits: number;
+  totalStudents: number;
+  averagePercentage: number;
+  fullyCompletedStudentsCount: number;
+  students: CohortStudentProgress[];
+}
+
+

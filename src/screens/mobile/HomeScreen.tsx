@@ -26,14 +26,14 @@ import {
   Droplets,
   CheckCircle2,
   ClipboardList,
-} from 'lucide-react-native';
 import { theme } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import type { Subject, Exam } from '@/types';
+import type { Subject, Exam, StudentOverallProgress } from '@/types';
 import { getDailyStudyProgress } from '@/service/studyPlanner';
 import { getStudentUpcomingExams } from '@/service/exam';
 import { getTodayHydration, logWaterIntake } from '@/service/hydration';
+import { getStudentOverallProgress } from '@/service/progress';
 
 type SupabaseSubject = {
   id: string;
@@ -57,15 +57,17 @@ export default function HomeScreen() {
   const [plannerProgress, setPlannerProgress] = useState<{ total: number; completed: number; percentage: number }>({ total: 0, completed: 0, percentage: 0 });
   const [nextExam, setNextExam] = useState<Exam | null>(null);
   const [waterMl, setWaterMl] = useState(0);
+  const [overallProgress, setOverallProgress] = useState<StudentOverallProgress | null>(null);
 
   const loadUserData = useCallback(async () => {
     if (!user) return;
     try {
-      const [profileRes, progData, examsData, hydrationData] = await Promise.all([
+      const [profileRes, progData, examsData, hydrationData, studentProg] = await Promise.all([
         supabase.from('profiles').select('full_name').eq('id', user.id).single(),
         getDailyStudyProgress(user.id),
         getStudentUpcomingExams(user.id),
         getTodayHydration(user.id),
+        getStudentOverallProgress(user.id),
       ]);
 
       if (profileRes.data?.full_name) {
@@ -82,6 +84,7 @@ export default function HomeScreen() {
         setNextExam(null);
       }
       setWaterMl(hydrationData.totalMl);
+      setOverallProgress(studentProg);
     } catch {
       // Ignored
     }
@@ -337,25 +340,44 @@ export default function HomeScreen() {
 
 
         {/* Progress Card */}
-        <View style={styles.progressCard}>
+        <TouchableOpacity
+          style={styles.progressCard}
+          onPress={() => navigation.navigate('StudentProgress')}
+          activeOpacity={0.9}
+        >
           <View style={styles.progressHeader}>
-            <GraduationCap size={18} color="#FFFFFF" />
-            <Text style={styles.progressSemester}>Semester 5 (Active)</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <GraduationCap size={18} color="#FFFFFF" />
+              <Text style={styles.progressSemester}>Academic Progress</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={{ fontSize: 11, color: '#DBEAFE', fontWeight: '700' }}>View Details</Text>
+              <ChevronRight size={14} color="#DBEAFE" />
+            </View>
           </View>
-          <Text style={styles.progressTitle}>Your Semester Overview</Text>
+          <Text style={styles.progressTitle}>Your Learning Overview</Text>
 
           <View style={styles.progressStats}>
             <View>
-              <Text style={styles.progressVal}>38%</Text>
+              <Text style={styles.progressVal}>{overallProgress?.overallPercentage ?? 0}%</Text>
               <Text style={styles.progressLabel}>Overall completion</Text>
             </View>
             <View style={styles.progressDivider} />
             <View>
-              <Text style={styles.progressVal}>{loading ? '...' : subjects.length}</Text>
-              <Text style={styles.progressLabel}>Registered Subjects</Text>
+              <Text style={styles.progressVal}>
+                {overallProgress?.completedUnits ?? 0} / {overallProgress?.totalUnits ?? 0}
+              </Text>
+              <Text style={styles.progressLabel}>Completed Units</Text>
+            </View>
+            <View style={styles.progressDivider} />
+            <View>
+              <Text style={styles.progressVal}>
+                {loading ? '...' : (overallProgress?.totalSubjects || subjects.length)}
+              </Text>
+              <Text style={styles.progressLabel}>Enrolled Subjects</Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* AI Assistant Banner */}
         <TouchableOpacity

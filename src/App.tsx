@@ -21,9 +21,9 @@ import AddSubjectScreen from '@/screens/teacher/AddSubjectScreen';
 import AddUnitScreen from '@/screens/teacher/AddUnitScreen';
 import AddYoutubeScreen from '@/screens/teacher/AddYoutubeScreen';
 import TeacherAnnouncementsScreen from '@/screens/teacher/TeacherAnnouncementsScreen';
-import ManageMaterialsScreen from '@/screens/teacher/ManageMaterialsScreen';
 import ArrearSubjectsScreen from '@/screens/student/ArrearSubjectsScreen';
 import StudentAssignmentsScreen from '@/screens/student/StudentAssignmentsScreen';
+import StudentProgressScreen from '@/screens/student/StudentProgressScreen';
 import AddPdfScreen from '@/screens/teacher/AddPdfScreen';
 import PdfTrackingScreen from '@/screens/teacher/PdfTrackingScreen';
 import TeacherAssignmentsScreen from '@/screens/teacher/TeacherAssignmentsScreen';
@@ -67,6 +67,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <StudentAssignmentsScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/progress"
+          element={
+            <ProtectedRoute role="student">
+              <StudentProgressScreen />
             </ProtectedRoute>
           }
         />
