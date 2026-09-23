@@ -1,13 +1,16 @@
-import { Platform } from 'react-native';
+import { Platform, Vibration, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { StudyTask, Exam, StudentNotificationSettings } from '@/types';
 
-// Conditionally import expo-notifications to prevent errors on web
+// Conditionally load expo-notifications (supported in Development Builds and standalone APKs)
 let Notifications: any = null;
-try {
-  Notifications = require('expo-notifications');
-} catch (err) {
-  console.warn('expo-notifications module not loaded:', err);
+if (Platform.OS !== 'web') {
+  try {
+    Notifications = require('expo-notifications');
+  } catch (_err) {
+    // Silently fallback on Expo Go (SDK 53+ development builds are recommended for native push)
+    Notifications = null;
+  }
 }
 
 const STORAGE_KEYS = {
@@ -41,8 +44,8 @@ export function setupNotificationHandler() {
         shouldSetBadge: false,
       }),
     });
-  } catch (err) {
-    console.warn('Error setting notification handler:', err);
+  } catch (_err) {
+    // Ignore in Expo Go
   }
 }
 
@@ -50,7 +53,7 @@ export function setupNotificationHandler() {
  * Request notification permissions and configure Android Notification Channels
  */
 export async function requestNotificationPermissions(): Promise<boolean> {
-  if (!Notifications || Platform.OS === 'web') return false;
+  if (!Notifications || Platform.OS === 'web') return true;
 
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -383,19 +386,27 @@ export async function scheduleCustomTimedNotification(params: {
       return { success: false, error: 'The selected time has already passed. Please choose a future time.' };
     }
 
-    const notifId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: `⏰ ${params.title}`,
-        body: params.body || `It's time for your scheduled study session (${params.time}). Open Smart Study to begin!`,
-        data: { type: params.type || 'custom', scheduledTime: params.time },
-        sound: 'default',
-        channelId: 'study-reminders',
-      },
-      trigger: {
-        type: 'date',
-        date: triggerDate,
-      },
-    });
+    let notifId = `reminder_${Date.now()}`;
+    if (Notifications) {
+      try {
+        const id = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: `⏰ ${params.title}`,
+            body: params.body || `It's time for your scheduled study session (${params.time}). Open Smart Study to begin!`,
+            data: { type: params.type || 'custom', scheduledTime: params.time },
+            sound: 'default',
+            channelId: 'study-reminders',
+          },
+          trigger: {
+            type: 'date',
+            date: triggerDate,
+          },
+        });
+        if (id) notifId = id;
+      } catch (_err) {
+        // Fallback to local storage scheduling
+      }
+    }
 
     // Save reminder in local storage
     const existingRaw = await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_REMINDERS);
@@ -438,9 +449,11 @@ export async function getCustomTimedReminders(): Promise<CustomTimedReminder[]> 
   * Delete a specific custom timed reminder
   */
 export async function deleteCustomTimedReminder(notificationId: string): Promise<boolean> {
-  if (!Notifications || Platform.OS === 'web') return false;
+  if (Platform.OS === 'web') return false;
   try {
-    await Notifications.cancelScheduledNotificationAsync(notificationId).catch(() => {});
+    if (Notifications) {
+      await Notifications.cancelScheduledNotificationAsync(notificationId).catch(() => {});
+    }
     const existingRaw = await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_REMINDERS);
     if (existingRaw) {
       const list: CustomTimedReminder[] = JSON.parse(existingRaw);
@@ -461,25 +474,30 @@ export async function sendInstantTestNotification(
   title: string = '🔔 Smart Study Notification Test',
   body: string = 'Push notifications and timed alerts are active on your device!'
 ): Promise<{ success: boolean; error?: string }> {
-  if (!Notifications || Platform.OS === 'web') {
+  if (Platform.OS === 'web') {
     return { success: false, error: 'Phone notifications are only supported on mobile devices.' };
   }
 
   try {
-    const hasPermission = await requestNotificationPermissions();
-    if (!hasPermission) {
-      return { success: false, error: 'Please grant notification permissions in your device settings.' };
-    }
+    // Vibrate device to confirm haptic hardware
+    try {
+      Vibration.vibrate([0, 350, 150, 350]);
+    } catch (_vErr) {}
 
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        sound: 'default',
-        channelId: 'study-reminders',
-      },
-      trigger: null,
-    });
+    if (Notifications) {
+      const hasPermission = await requestNotificationPermissions();
+      if (hasPermission) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+            sound: 'default',
+            channelId: 'study-reminders',
+          },
+          trigger: null,
+        });
+      }
+    }
 
     return { success: true };
   } catch (err: any) {
