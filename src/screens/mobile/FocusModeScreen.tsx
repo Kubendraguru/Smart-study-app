@@ -437,7 +437,6 @@ export default function FocusModeScreen() {
                 <Hourglass size={14} color="#FFFFFF" />
                 <Text style={styles.heroBadgeText}>Study Mode</Text>
               </View>
-              <h2 style={{ display: 'none' }}>Focus Setup</h2>
               <Text style={styles.heroTitle}>Lock In Your Focus</Text>
               <Text style={styles.heroSub}>
                 Select your focus interval, pick your subject, and eliminate distractions.
