@@ -26,6 +26,7 @@ import {
   Droplets,
   CheckCircle2,
   ClipboardList,
+} from 'lucide-react-native';
 import { theme } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
