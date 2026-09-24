@@ -11,6 +11,8 @@ import {
   ClipboardList,
   Sparkles,
   Hourglass,
+  Calculator,
+  Award,
 } from 'lucide-react';
 
 import PageContainer from '@/components/layout/PageContainer';
@@ -21,9 +23,10 @@ import Avatar from '@/components/ui/Avatar';
 import { notifications } from '@/data/notifications';
 import { signOut } from '@/service/auth';
 import { supabase } from '@/lib/supabase';
-import type { Subject, StudentOverallProgress } from '@/types';
+import type { Subject, StudentOverallProgress, OverallAcademicSummary } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { getStudentOverallProgress } from '@/service/progress';
+import { getStudentAcademicSummary } from '@/service/gpa';
 
 type SupabaseSubject = {
   id: string;
@@ -42,27 +45,30 @@ export default function HomeScreen() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [overallProgress, setOverallProgress] = useState<StudentOverallProgress | null>(null);
+  const [academicSummary, setAcademicSummary] = useState<OverallAcademicSummary | null>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   useEffect(() => {
-  loadSubjects();
-}, [user]);
+    loadSubjects();
+  }, [user]);
 
-async function loadSubjects() {
-  if (!user) return;
+  async function loadSubjects() {
+    if (!user) return;
 
-  setLoading(true);
+    setLoading(true);
 
-  try {
-    // 0. Get student profile semester
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('semester, full_name')
-      .eq('id', user.id)
-      .single();
+    try {
+      // Parallel load
+      const [profileRes, prog, gpaSummary] = await Promise.all([
+        supabase.from('profiles').select('semester, full_name').eq('id', user.id).single(),
+        getStudentOverallProgress(user.id),
+        getStudentAcademicSummary(user.id),
+      ]);
+      setOverallProgress(prog);
+      setAcademicSummary(gpaSummary);
 
-    const studentSem = profile?.semester || 5;
+      const studentSem = profileRes.data?.semester || 5;
 
     // 1. Get current semester subjects
     const { data: currentSubjects, error: currentError } =
@@ -153,10 +159,6 @@ async function loadSubjects() {
       ...formattedCurrentSubjects,
       ...formattedArrears,
     ]);
-
-    // Fetch live overall progress
-    const prog = await getStudentOverallProgress(user.id);
-    setOverallProgress(prog);
   } catch (error) {
     console.error('Unexpected error:', error);
   } finally {
@@ -303,8 +305,80 @@ const recentlyViewed = currentSubjects.slice(0, 3);
             </div>
           </motion.div>
 
+          {/* GPA & CGPA Calculator Dashboard Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            onClick={() => navigate('/gpa-calculator')}
+            className="bg-white rounded-2xl p-5 mb-6 shadow-sm shadow-gray-200/60 border border-gray-100 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all group"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Calculator size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                    GPA & CGPA Calculator
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {academicSummary && academicSummary.totalSemesters > 0
+                      ? `${academicSummary.totalSemesters} Semesters Tracked • ${academicSummary.totalCreditsEarned} Credits Earned`
+                      : 'Calculate semester GPA & overall cumulative CGPA'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 text-xs font-bold text-blue-600">
+                <span>{academicSummary && academicSummary.totalSemesters > 0 ? 'View Details' : 'Calculate'}</span>
+                <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+
+            {academicSummary && academicSummary.totalSemesters > 0 ? (
+              <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-100">
+                <div className="bg-blue-50/60 rounded-xl p-2.5 text-center">
+                  <p className="text-[11px] text-gray-500 font-medium">Cumulative CGPA</p>
+                  <p className="text-lg font-black text-blue-700">
+                    {academicSummary.overallCgpa.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-2.5 text-center">
+                  <p className="text-[11px] text-gray-500 font-medium">Latest GPA</p>
+                  <p className="text-lg font-black text-gray-900">
+                    {academicSummary.currentSemesterGpa.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-2.5 text-center">
+                  <p className="text-[11px] text-gray-500 font-medium">Credits Earned</p>
+                  <p className="text-lg font-black text-gray-900">
+                    {academicSummary.totalCreditsEarned}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                <span className="text-xs text-gray-500">No results entered yet</span>
+                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">
+                  + Add Semester Grades
+                </span>
+              </div>
+            )}
+          </motion.div>
+
           {/* Quick Hub Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+            <button
+              onClick={() => navigate('/gpa-calculator')}
+              className="bg-white rounded-2xl p-3.5 flex flex-col items-center gap-1.5 shadow-sm border border-gray-100 hover:shadow-md transition-all text-left"
+            >
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Calculator size={20} />
+              </div>
+              <span className="text-xs font-bold text-gray-800">GPA / CGPA</span>
+              <span className="text-[10px] text-gray-400">Calculator</span>
+            </button>
+
             <button
               onClick={() => navigate('/focus')}
               className="bg-white rounded-2xl p-3.5 flex flex-col items-center gap-1.5 shadow-sm border border-gray-100 hover:shadow-md transition-all text-left"
@@ -335,18 +409,18 @@ const recentlyViewed = currentSubjects.slice(0, 3);
                 <GraduationCap size={20} />
               </div>
               <span className="text-xs font-bold text-gray-800">Arrears</span>
-              <span className="text-[10px] text-gray-400">Backlog courses</span>
+              <span className="text-[10px] text-gray-400">Backlogs</span>
             </button>
 
             <button
               onClick={() => navigate('/ai-assistant')}
               className="bg-white rounded-2xl p-3.5 flex flex-col items-center gap-1.5 shadow-sm border border-gray-100 hover:shadow-md transition-all text-left"
             >
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                 <Sparkles size={20} />
               </div>
               <span className="text-xs font-bold text-gray-800">Ask AI</span>
-              <span className="text-[10px] text-gray-400">Doubts & notes</span>
+              <span className="text-[10px] text-gray-400">Doubts</span>
             </button>
           </div>
 

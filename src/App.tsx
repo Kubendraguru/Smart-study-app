@@ -25,6 +25,7 @@ import ArrearSubjectsScreen from '@/screens/student/ArrearSubjectsScreen';
 import StudentAssignmentsScreen from '@/screens/student/StudentAssignmentsScreen';
 import StudentProgressScreen from '@/screens/student/StudentProgressScreen';
 import FocusModeScreen from '@/screens/student/FocusModeScreen';
+import GpaCalculatorScreen from '@/screens/student/GpaCalculatorScreen';
 import AddPdfScreen from '@/screens/teacher/AddPdfScreen';
 import PdfTrackingScreen from '@/screens/teacher/PdfTrackingScreen';
 import TeacherAssignmentsScreen from '@/screens/teacher/TeacherAssignmentsScreen';
@@ -84,6 +85,14 @@ export default function App() {
           element={
             <ProtectedRoute role="student">
               <FocusModeScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/gpa-calculator"
+          element={
+            <ProtectedRoute role="student">
+              <GpaCalculatorScreen />
             </ProtectedRoute>
           }
         />

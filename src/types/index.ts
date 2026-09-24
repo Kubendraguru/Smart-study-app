@@ -412,6 +412,94 @@ export interface MotivationalMessage {
   emoji: string;
 }
 
+// ----------------------------------------------------
+// GPA & CGPA Calculator Types
+// ----------------------------------------------------
 
+export type GradingSchemeId = 'anna_univ_10' | 'ugc_10' | 'us_4' | 'custom';
 
+export type RepeatAttemptPolicy = 'latest_attempt' | 'highest_attempt' | 'all_attempts';
 
+export interface GradeDefinition {
+  grade: string;
+  points: number;
+  isPass: boolean;
+  isCounted: boolean;
+  description?: string;
+}
+
+export interface GradingScheme {
+  id: GradingSchemeId;
+  name: string;
+  description: string;
+  maxGradePoint: number;
+  passingMinPoints: number;
+  grades: GradeDefinition[];
+  isOfficialPreset: boolean;
+}
+
+export interface StudentGpaSettings {
+  studentId: string;
+  gradingSchemeId: GradingSchemeId;
+  gradingSchemeName: string;
+  maxGradePoint: number;
+  passingMinPoints: number;
+  repeatPolicy: RepeatAttemptPolicy;
+  customGrades: GradeDefinition[];
+  updatedAt?: string;
+}
+
+export interface AcademicCourse {
+  id: string;
+  studentId: string;
+  semesterId?: string;
+  semesterNumber: number;
+  subjectId?: string | null;
+  subjectCode?: string;
+  subjectName: string;
+  credits: number;
+  grade: string;
+  gradePoint: number;
+  isArrear?: boolean;
+  isCleared?: boolean;
+  isExcluded?: boolean;
+  attemptNumber?: number;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SemesterAcademicSummary {
+  id?: string;
+  semesterNumber: number;
+  semesterLabel: string;
+  academicYear?: string;
+  courses: AcademicCourse[];
+  totalCredits: number;
+  earnedCredits: number;
+  totalGradePoints: number;
+  gpa: number;
+  isCalculated: boolean;
+}
+
+export interface SemesterGpaTrend {
+  semesterNumber: number;
+  semesterLabel: string;
+  gpa: number;
+  cgpaToDate: number;
+  creditsEarned: number;
+  totalCredits: number;
+}
+
+export interface OverallAcademicSummary {
+  studentId: string;
+  currentSemesterGpa: number;
+  overallCgpa: number;
+  totalSemesters: number;
+  totalCreditsEarned: number;
+  totalApplicableCredits: number;
+  totalGradePoints: number;
+  settings: StudentGpaSettings;
+  semesters: SemesterAcademicSummary[];
+  history: SemesterGpaTrend[];
+}

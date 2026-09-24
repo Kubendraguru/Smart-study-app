@@ -31,6 +31,7 @@ import ArrearSubjectsScreen from '@/screens/mobile/ArrearSubjectsScreen';
 import StudentAssignmentsScreen from '@/screens/mobile/StudentAssignmentsScreen';
 import StudentProgressScreen from '@/screens/mobile/StudentProgressScreen';
 import FocusModeScreen from '@/screens/mobile/FocusModeScreen';
+import GpaCalculatorScreen from '@/screens/mobile/GpaCalculatorScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -117,6 +118,7 @@ export default function StudentNavigator() {
       <Stack.Screen name="StudentAssignments" component={StudentAssignmentsScreen} />
       <Stack.Screen name="StudentProgress" component={StudentProgressScreen} />
       <Stack.Screen name="FocusMode" component={FocusModeScreen} />
+      <Stack.Screen name="GpaCalculator" component={GpaCalculatorScreen} />
     </Stack.Navigator>
   );
 }

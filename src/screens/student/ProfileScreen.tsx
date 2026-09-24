@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   Settings, ChevronRight, GraduationCap, Bookmark, Bell, Download,
-  HelpCircle, LogOut, Moon, Globe, Shield, BrainCircuit,
+  HelpCircle, LogOut, Moon, Globe, Shield, BrainCircuit, Calculator,
 } from 'lucide-react';
 import PageContainer from '@/components/layout/PageContainer';
 import AppHeader from '@/components/layout/AppHeader';
@@ -13,13 +13,19 @@ import { subjects } from '@/data/subjects';
 
 const menuSections = [
 {
-  title: 'Learning',
+  title: 'Learning & Academics',
   items: [
+    {
+      icon: Calculator,
+      label: 'GPA & CGPA Calculator',
+      color: 'text-blue-600',
+      bg: 'bg-blue-50'
+    },
     {
       icon: GraduationCap,
       label: 'My Subjects',
-      color: 'text-blue-600',
-      bg: 'bg-blue-50'
+      color: 'text-indigo-600',
+      bg: 'bg-indigo-50'
     },
     {
       icon: GraduationCap,
@@ -108,7 +114,10 @@ export default function ProfileScreen() {
                       transition={{ delay: sIdx * 0.05 + i * 0.03 }}
                       whileTap={{ scale: 0.98 }}
                      onClick={() => {
-  if (item.label === 'My Subjects') {
+  if (item.label === 'GPA & CGPA Calculator') {
+    navigate('/gpa-calculator');
+  }
+  else if (item.label === 'My Subjects') {
     navigate('/semester/5');
   } 
   else if (item.label === 'Arrear Subjects') {

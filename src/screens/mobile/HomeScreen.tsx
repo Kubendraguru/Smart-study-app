@@ -27,15 +27,17 @@ import {
   CheckCircle2,
   ClipboardList,
   Hourglass,
+  Calculator,
 } from 'lucide-react-native';
 import { theme } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import type { Subject, Exam, StudentOverallProgress } from '@/types';
+import type { Subject, Exam, StudentOverallProgress, OverallAcademicSummary } from '@/types';
 import { getDailyStudyProgress } from '@/service/studyPlanner';
 import { getStudentUpcomingExams } from '@/service/exam';
 import { getTodayHydration, logWaterIntake } from '@/service/hydration';
 import { getStudentOverallProgress } from '@/service/progress';
+import { getStudentAcademicSummary } from '@/service/gpa';
 
 type SupabaseSubject = {
   id: string;
@@ -60,16 +62,18 @@ export default function HomeScreen() {
   const [nextExam, setNextExam] = useState<Exam | null>(null);
   const [waterMl, setWaterMl] = useState(0);
   const [overallProgress, setOverallProgress] = useState<StudentOverallProgress | null>(null);
+  const [academicSummary, setAcademicSummary] = useState<OverallAcademicSummary | null>(null);
 
   const loadUserData = useCallback(async () => {
     if (!user) return;
     try {
-      const [profileRes, progData, examsData, hydrationData, studentProg] = await Promise.all([
+      const [profileRes, progData, examsData, hydrationData, studentProg, gpaSummary] = await Promise.all([
         supabase.from('profiles').select('full_name').eq('id', user.id).single(),
         getDailyStudyProgress(user.id),
         getStudentUpcomingExams(user.id),
         getTodayHydration(user.id),
         getStudentOverallProgress(user.id),
+        getStudentAcademicSummary(user.id),
       ]);
 
       if (profileRes.data?.full_name) {
@@ -87,6 +91,7 @@ export default function HomeScreen() {
       }
       setWaterMl(hydrationData.totalMl);
       setOverallProgress(studentProg);
+      setAcademicSummary(gpaSummary);
     } catch {
       // Ignored
     }
@@ -292,9 +297,26 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Quick Hub Row: Planner, Focus Mode, Assignments & Hydration */}
+        {/* Quick Hub Row: Planner, Focus Mode, Assignments, GPA & Hydration */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
           <View style={[styles.quickHubRow, { gap: 10, marginBottom: 0 }]}>
+            {/* GPA Calculator Card */}
+            <TouchableOpacity
+              style={[styles.quickHubCard, { minWidth: 105 }]}
+              onPress={() => navigation.navigate('GpaCalculator')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickHubIconBox, { backgroundColor: '#EFF6FF' }]}>
+                <Calculator size={18} color={theme.colors.primary} />
+              </View>
+              <Text style={styles.quickHubTitle}>GPA / CGPA</Text>
+              <Text style={styles.quickHubSub}>
+                {academicSummary && academicSummary.totalSemesters > 0
+                  ? `${academicSummary.overallCgpa.toFixed(2)} CGPA`
+                  : 'Calculator'}
+              </Text>
+            </TouchableOpacity>
+
             {/* Study Planner Card */}
             <TouchableOpacity
               style={[styles.quickHubCard, { minWidth: 105 }]}
@@ -355,7 +377,6 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
 
-
         {/* Progress Card */}
         <TouchableOpacity
           style={styles.progressCard}
@@ -394,6 +415,58 @@ export default function HomeScreen() {
               <Text style={styles.progressLabel}>Enrolled Subjects</Text>
             </View>
           </View>
+        </TouchableOpacity>
+
+        {/* GPA & CGPA Calculator Dashboard Banner */}
+        <TouchableOpacity
+          style={styles.gpaHomeCard}
+          onPress={() => navigation.navigate('GpaCalculator')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.gpaHomeHeader}>
+            <View style={styles.gpaHomeLeft}>
+              <View style={styles.gpaHomeIconBox}>
+                <Calculator size={20} color={theme.colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.gpaHomeTitle}>GPA & CGPA Calculator</Text>
+                <Text style={styles.gpaHomeSub}>
+                  {academicSummary && academicSummary.totalSemesters > 0
+                    ? `${academicSummary.totalSemesters} Semesters • ${academicSummary.totalCreditsEarned} Credits Earned`
+                    : 'Calculate semester GPA & overall CGPA'}
+                </Text>
+              </View>
+            </View>
+            <ChevronRight size={18} color={theme.colors.textMuted} />
+          </View>
+
+          {academicSummary && academicSummary.totalSemesters > 0 ? (
+            <View style={styles.gpaHomeStatsRow}>
+              <View style={styles.gpaHomeStatItem}>
+                <Text style={styles.gpaHomeStatLabel}>Cumulative CGPA</Text>
+                <Text style={[styles.gpaHomeStatVal, { color: theme.colors.primary }]}>
+                  {academicSummary.overallCgpa.toFixed(2)}
+                </Text>
+              </View>
+              <View style={styles.gpaHomeStatDivider} />
+              <View style={styles.gpaHomeStatItem}>
+                <Text style={styles.gpaHomeStatLabel}>Latest GPA</Text>
+                <Text style={styles.gpaHomeStatVal}>
+                  {academicSummary.currentSemesterGpa.toFixed(2)}
+                </Text>
+              </View>
+              <View style={styles.gpaHomeStatDivider} />
+              <View style={styles.gpaHomeStatItem}>
+                <Text style={styles.gpaHomeStatLabel}>Credits Earned</Text>
+                <Text style={styles.gpaHomeStatVal}>{academicSummary.totalCreditsEarned}</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.gpaHomeEmptyRow}>
+              <Text style={styles.gpaHomeEmptyText}>No academic results recorded yet</Text>
+              <Text style={styles.gpaHomeEmptyAction}>+ Calculate Now</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         {/* AI Assistant Banner */}
@@ -943,5 +1016,96 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: theme.colors.textMuted,
     lineHeight: 15,
+  },
+  gpaHomeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.borderLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    marginBottom: 16,
+  },
+  gpaHomeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  gpaHomeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  gpaHomeIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gpaHomeTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: theme.colors.textDark,
+  },
+  gpaHomeSub: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    marginTop: 1,
+  },
+  gpaHomeStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 10,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  gpaHomeStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  gpaHomeStatLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+  },
+  gpaHomeStatVal: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: theme.colors.textDark,
+    marginTop: 2,
+  },
+  gpaHomeStatDivider: {
+    width: 1,
+    height: '70%',
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+  },
+  gpaHomeEmptyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.borderLight,
+  },
+  gpaHomeEmptyText: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+  },
+  gpaHomeEmptyAction: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: theme.colors.primary,
   },
 });

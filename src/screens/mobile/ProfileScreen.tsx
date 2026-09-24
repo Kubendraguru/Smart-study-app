@@ -20,6 +20,7 @@ import {
   Briefcase,
   Settings,
   ChevronRight,
+  Calculator,
 } from 'lucide-react-native';
 import { theme } from '@/theme';
 import AppHeader from '@/components/mobile/AppHeader';
@@ -133,6 +134,31 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+
+        {/* Student Academic Tools */}
+        {role !== 'teacher' && (
+          <>
+            <TouchableOpacity
+              style={styles.settingsBtn}
+              onPress={() => navigation.navigate('GpaCalculator')}
+              activeOpacity={0.8}
+            >
+              <Calculator size={18} color={theme.colors.primary} />
+              <Text style={styles.settingsBtnText}>GPA & CGPA Calculator</Text>
+              <ChevronRight size={18} color={theme.colors.textMuted} style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.settingsBtn}
+              onPress={() => navigation.navigate('StudentProgress')}
+              activeOpacity={0.8}
+            >
+              <GraduationCap size={18} color={theme.colors.primary} />
+              <Text style={styles.settingsBtnText}>Learning Progress Checklist</Text>
+              <ChevronRight size={18} color={theme.colors.textMuted} style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* Teacher Settings Button */}
         {role === 'teacher' && (
