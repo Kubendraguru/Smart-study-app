@@ -24,11 +24,12 @@
       },
       "package": "com.smartstudy.app",
       "permissions": [
-        "INTERNET",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "POST_NOTIFICATIONS",
-        "SCHEDULE_EXACT_ALARM"
+        "android.permission.INTERNET",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -49,6 +50,12 @@
           "color": "#2563EB"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "64ba1337-17ac-4a21-83bd-7968fcb7ec0f"
+      }
+    },
+    "owner": "harish-23"
   }
 }
