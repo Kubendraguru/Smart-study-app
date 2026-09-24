@@ -334,67 +334,33 @@ export async function getStudentOverallProgress(studentId?: string): Promise<Stu
       // Ignore pdf_views table missing error
     }
 
-    // 7. Calculate subject summaries ensuring 5 full units per subject
+    // 7. Calculate subject summaries based strictly on teacher-uploaded units
     let totalAllUnits = 0;
     let totalAllCompleted = 0;
 
     const subjectsSummary: SubjectProgressSummary[] = allSubjectList.map((subj) => {
       const rawUnits = unitsBySubject.get(subj.id) || [];
-      const unitProgressItems: UnitProgressItem[] = [];
       let completedUnits = 0;
 
-      // Ensure all 5 units (Units 1 to 5) are represented
-      for (let uNum = 1; uNum <= 5; uNum++) {
-        const existingDbUnit = rawUnits.find((u: any) => u.unit_number === uNum);
-
-        let unitId: string;
-        let title: string;
-        let description: string | null = null;
-
-        if (existingDbUnit) {
-          unitId = existingDbUnit.id;
-          title = existingDbUnit.unit_title || existingDbUnit.title || `Unit ${uNum}`;
-          description = existingDbUnit.description || null;
-        } else {
-          unitId = `${subj.id}-unit-${uNum}`;
-          title = `Unit ${uNum}: Syllabus Topics & Notes`;
-          description = `Curriculum materials, lecture notes, and question bank for Unit ${uNum}.`;
-        }
-
+      const unitProgressItems: UnitProgressItem[] = rawUnits.map((u: any) => {
         const isDone =
-          completedUnitSet.has(unitId) ||
-          completedUnitSet.has(`${subj.id}-unit-${uNum}`);
+          completedUnitSet.has(u.id) ||
+          completedUnitSet.has(`${subj.id}-unit-${u.unit_number}`);
 
         if (isDone) completedUnits += 1;
 
-        unitProgressItems.push({
-          id: unitId,
-          unitNumber: uNum,
-          title,
-          description,
+        return {
+          id: u.id,
+          unitNumber: u.unit_number,
+          title: u.unit_title || u.title || `Unit ${u.unit_number}`,
+          description: u.description || null,
           completed: isDone,
-        });
-      }
-
-      // Include extra teacher units if unit_number > 5
-      rawUnits.forEach((u: any) => {
-        if (u.unit_number > 5) {
-          const isDone = completedUnitSet.has(u.id);
-          if (isDone) completedUnits += 1;
-
-          unitProgressItems.push({
-            id: u.id,
-            unitNumber: u.unit_number,
-            title: u.unit_title || u.title || `Unit ${u.unit_number}`,
-            description: u.description || null,
-            completed: isDone,
-          });
-        }
+        };
       });
 
-      const totalUnits = unitProgressItems.length || 5;
+      const totalUnits = unitProgressItems.length;
       const remainingUnits = Math.max(0, totalUnits - completedUnits);
-      const percentage = Math.round((completedUnits / totalUnits) * 100);
+      const percentage = totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0;
 
       totalAllUnits += totalUnits;
       totalAllCompleted += completedUnits;
@@ -452,7 +418,7 @@ export async function getTeacherCohortProgress(subjectId: string): Promise<Teach
       return null;
     }
 
-    // 2. Fetch all units for this subject (ensuring 5 units)
+    // 2. Fetch all teacher-uploaded units for this subject
     const { data: unitsData } = await supabase
       .from('units')
       .select('id, unit_number, title, unit_title')
@@ -460,24 +426,11 @@ export async function getTeacherCohortProgress(subjectId: string): Promise<Teach
       .order('unit_number', { ascending: true });
 
     const rawUnits = unitsData || [];
-    const subjectUnits: { id: string; unitNumber: number; title: string }[] = [];
-
-    for (let uNum = 1; uNum <= 5; uNum++) {
-      const existing = rawUnits.find((u: any) => u.unit_number === uNum);
-      if (existing) {
-        subjectUnits.push({
-          id: existing.id,
-          unitNumber: uNum,
-          title: existing.unit_title || existing.title || `Unit ${uNum}`,
-        });
-      } else {
-        subjectUnits.push({
-          id: `${subjectId}-unit-${uNum}`,
-          unitNumber: uNum,
-          title: `Unit ${uNum}`,
-        });
-      }
-    }
+    const subjectUnits = rawUnits.map((u: any) => ({
+      id: u.id,
+      unitNumber: u.unit_number,
+      title: u.unit_title || u.title || `Unit ${u.unit_number}`,
+    }));
 
     const totalUnits = subjectUnits.length;
     const unitIds = subjectUnits.map((u) => u.id);

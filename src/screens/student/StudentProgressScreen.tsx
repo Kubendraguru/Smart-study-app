@@ -282,8 +282,11 @@ export default function StudentProgressScreen() {
                             </div>
 
                             <p className="text-xs text-gray-500 font-medium">
-                              Completed {subj.completedUnits} of {subj.totalUnits} units
-                              {subj.remainingUnits > 0 ? ` (${subj.remainingUnits} remaining)` : ' ✓ Finished'}
+                              {subj.totalUnits > 0
+                                ? `Completed ${subj.completedUnits} of ${subj.totalUnits} units${
+                                    subj.remainingUnits > 0 ? ` (${subj.remainingUnits} remaining)` : ' ✓ Finished'
+                                  }`
+                                : 'No units added by instructor yet'}
                             </p>
                           </div>
 

@@ -329,7 +329,9 @@ export default function StudentProgressScreen() {
                         </View>
 
                         <Text style={styles.unitsCountSummary}>
-                          Completed {subj.completedUnits} of {subj.totalUnits} units ({subj.remainingUnits} remaining)
+                          {subj.totalUnits > 0
+                            ? `Completed ${subj.completedUnits} of ${subj.totalUnits} units (${subj.remainingUnits} remaining)`
+                            : 'No units added by instructor yet'}
                         </Text>
                       </View>
 

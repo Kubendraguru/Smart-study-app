@@ -216,69 +216,29 @@ export default function SubjectDetailsScreen() {
       // Fetch student's completed unit IDs
       const completedUnitSet = await getCompletedUnitIds(user.id);
 
-      // Build 5 full curriculum units
+      // Build units list from teacher-uploaded units only
       const rawUnits = unitData ?? [];
-      const formattedUnitsList: any[] = [];
       let completedCount = 0;
 
-      for (let uNum = 1; uNum <= 5; uNum++) {
-        const existing = rawUnits.find((u: any) => u.unit_number === uNum);
-        if (existing) {
-          const isDone = completedUnitSet.has(existing.id);
-          if (isDone) completedCount += 1;
+      const formattedUnitsList = rawUnits.map((u: any) => {
+        const isDone = completedUnitSet.has(u.id);
+        if (isDone) completedCount += 1;
 
-          formattedUnitsList.push({
-            id: existing.id,
-            number: existing.unit_number,
-            title: existing.unit_title ?? existing.title ?? `Unit ${existing.unit_number}`,
-            description: existing.description ?? '',
-            pdfs: materialsByUnit[existing.id] ?? [],
-            videos: [],
-            importantQuestions: [],
-            assignments: [],
-            completed: isDone,
-          });
-        } else {
-          const placeholderId = `${subjectId}-unit-${uNum}`;
-          const isDone = completedUnitSet.has(placeholderId);
-          if (isDone) completedCount += 1;
-
-          formattedUnitsList.push({
-            id: placeholderId,
-            number: uNum,
-            title: `Unit ${uNum}: Syllabus Topics & Notes`,
-            description: `Curriculum materials, lecture notes, and question bank for Unit ${uNum}.`,
-            pdfs: [],
-            videos: [],
-            importantQuestions: [],
-            assignments: [],
-            completed: isDone,
-          });
-        }
-      }
-
-      // Append extra units if teacher added >5
-      rawUnits.forEach((u: any) => {
-        if (u.unit_number > 5) {
-          const isDone = completedUnitSet.has(u.id);
-          if (isDone) completedCount += 1;
-
-          formattedUnitsList.push({
-            id: u.id,
-            number: u.unit_number,
-            title: u.unit_title ?? u.title ?? `Unit ${u.unit_number}`,
-            description: u.description ?? '',
-            pdfs: materialsByUnit[u.id] ?? [],
-            videos: [],
-            importantQuestions: [],
-            assignments: [],
-            completed: isDone,
-          });
-        }
+        return {
+          id: u.id,
+          number: u.unit_number,
+          title: u.unit_title ?? u.title ?? `Unit ${u.unit_number}`,
+          description: u.description ?? '',
+          pdfs: materialsByUnit[u.id] ?? [],
+          videos: [],
+          importantQuestions: [],
+          assignments: [],
+          completed: isDone,
+        };
       });
 
-      const totalUnits = formattedUnitsList.length || 5;
-      const progressPercentage = Math.round((completedCount / totalUnits) * 100);
+      const totalUnits = formattedUnitsList.length;
+      const progressPercentage = totalUnits > 0 ? Math.round((completedCount / totalUnits) * 100) : 0;
 
       const formattedSubject: Subject = {
         id: dbSubject.id,
