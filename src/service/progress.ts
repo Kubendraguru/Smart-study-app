@@ -303,11 +303,15 @@ export async function getStudentOverallProgress(studentId?: string): Promise<Stu
     }
 
     // 4. Fetch all units for these subjects
-    const { data: unitsData } = await supabase
+    const { data: unitsData, error: unitsError } = await supabase
       .from('units')
-      .select('id, subject_id, unit_number, title, unit_title, description')
+      .select('id, subject_id, unit_number, unit_title, description')
       .in('subject_id', subjectIds)
       .order('unit_number', { ascending: true });
+
+    if (unitsError) {
+      console.error('Error fetching units in getStudentOverallProgress:', unitsError);
+    }
 
     const unitsBySubject = new Map<string, any[]>();
     (unitsData || []).forEach((u: any) => {
@@ -419,11 +423,15 @@ export async function getTeacherCohortProgress(subjectId: string): Promise<Teach
     }
 
     // 2. Fetch all teacher-uploaded units for this subject
-    const { data: unitsData } = await supabase
+    const { data: unitsData, error: unitsError } = await supabase
       .from('units')
-      .select('id, unit_number, title, unit_title')
+      .select('id, unit_number, unit_title, description')
       .eq('subject_id', subjectId)
       .order('unit_number', { ascending: true });
+
+    if (unitsError) {
+      console.error('Error fetching units in getTeacherCohortProgress:', unitsError);
+    }
 
     const rawUnits = unitsData || [];
     const subjectUnits = rawUnits.map((u: any) => ({
