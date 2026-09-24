@@ -12,6 +12,7 @@ import {
   AlertCircle,
   ExternalLink,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 import PageContainer from '@/components/layout/PageContainer';
 import AppHeader from '@/components/layout/AppHeader';
@@ -21,6 +22,7 @@ import { useAuth } from '@/context/AuthContext';
 import { recordPdfView } from '@/service/tracking';
 import { useArrearMotivation } from '@/hooks/useArrearMotivation';
 import ArrearMotivationToast from '@/components/arrear/ArrearMotivationToast';
+import { downloadPdf } from '@/utils/fileDownloader';
 import type { Pdf } from '@/types';
 
 export default function PdfViewerScreen() {
@@ -37,6 +39,7 @@ export default function PdfViewerScreen() {
   const [subjectName, setSubjectName] = useState<string>(stateSubjectName ?? '');
   const [subjectId, setSubjectId] = useState<string | undefined>(stateSubjectId);
   const [loading, setLoading] = useState<boolean>(!statePdf);
+  const [downloading, setDownloading] = useState<boolean>(false);
   const [loadingPdf, setLoadingPdf] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
@@ -144,16 +147,16 @@ export default function PdfViewerScreen() {
 
   const fileUrl = pdf?.file_url || pdf?.url;
 
-  const handleDownload = () => {
-    if (!fileUrl) return;
-    const a = document.createElement('a');
-    a.href = fileUrl;
-    a.download = pdf?.title ? `${pdf.title}.pdf` : 'document.pdf';
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const handleDownload = async () => {
+    if (!fileUrl || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadPdf(fileUrl, pdf?.title || 'study_material');
+    } catch (err) {
+      console.error('Failed to download PDF:', err);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handleShare = async () => {
@@ -250,8 +253,17 @@ export default function PdfViewerScreen() {
             <IconButton variant="ghost" onClick={handleShare} title="Share PDF">
               <Share2 size={18} className="text-gray-500" />
             </IconButton>
-            <IconButton variant="ghost" onClick={handleDownload} title="Download PDF">
-              <Download size={18} className="text-gray-500" />
+            <IconButton
+              variant="ghost"
+              onClick={handleDownload}
+              disabled={downloading}
+              title="Download PDF"
+            >
+              {downloading ? (
+                <Loader2 size={18} className="animate-spin text-blue-600" />
+              ) : (
+                <Download size={18} className="text-gray-500" />
+              )}
             </IconButton>
           </div>
         }
@@ -286,15 +298,13 @@ export default function PdfViewerScreen() {
               <p className="text-xs text-gray-500 mb-4 max-w-xs">
                 Your browser cannot display this PDF inline. You can open it directly in a new tab or download it.
               </p>
-              <a
-                href={fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-600 text-xs font-semibold rounded-xl hover:bg-blue-100 transition-colors"
+              <button
+                onClick={handleDownload}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition-colors"
               >
-                <ExternalLink size={14} />
-                Open PDF in New Tab
-              </a>
+                <Download size={14} />
+                Download PDF File
+              </button>
             </div>
           ) : (
             <iframe
@@ -365,10 +375,15 @@ export default function PdfViewerScreen() {
         {/* Download Button */}
         <button
           onClick={handleDownload}
-          className="mt-4 flex items-center justify-center gap-2 w-full py-3.5 bg-blue-600 text-white font-semibold rounded-2xl shadow-sm shadow-blue-600/30 hover:bg-blue-700 transition-colors"
+          disabled={downloading}
+          className="mt-4 flex items-center justify-center gap-2 w-full py-3.5 bg-blue-600 text-white font-semibold rounded-2xl shadow-sm shadow-blue-600/30 hover:bg-blue-700 transition-colors disabled:opacity-75"
         >
-          <Download size={18} />
-          Download PDF
+          {downloading ? (
+            <Loader2 size={18} className="animate-spin text-white" />
+          ) : (
+            <Download size={18} />
+          )}
+          <span>{downloading ? 'Downloading...' : 'Download PDF'}</span>
         </button>
       </div>
 

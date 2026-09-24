@@ -28,6 +28,7 @@ import {
   ClipboardList,
   CheckCircle2,
   Circle,
+  Download,
 } from 'lucide-react-native';
 import { theme } from '@/theme';
 import AppHeader from '@/components/mobile/AppHeader';
@@ -38,6 +39,7 @@ import { getBooks } from '@/service/books';
 import { isUnitCompleted, toggleUnitCompletion } from '@/service/progress';
 import { useArrearMotivation } from '@/hooks/useArrearMotivation';
 import ArrearMotivationToast from '@/components/mobile/ArrearMotivationToast';
+import { downloadPdf } from '@/utils/fileDownloader';
 import type { Video, Book, Assignment } from '@/types';
 
 type PdfItem = {
@@ -73,6 +75,7 @@ export default function UnitDetailsScreen() {
 
   const [isCompleted, setIsCompleted] = useState(false);
   const [togglingCompletion, setTogglingCompletion] = useState(false);
+  const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null);
   const [pdfs, setPdfs] = useState<PdfItem[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const [playlists, setPlaylists] = useState<Video[]>([]);
@@ -208,6 +211,18 @@ export default function UnitDetailsScreen() {
         fileUrl: pdf.file_url,
       },
     });
+  };
+
+  const handleDownloadPdf = async (pdf: PdfItem) => {
+    if (!pdf.file_url || downloadingPdfId) return;
+    setDownloadingPdfId(pdf.id);
+    try {
+      await downloadPdf(pdf.file_url, pdf.title);
+    } catch (err) {
+      console.error('Download error:', err);
+    } finally {
+      setDownloadingPdfId(null);
+    }
   };
 
   const formatDate = (isoString?: string) => {
@@ -386,15 +401,34 @@ export default function UnitDetailsScreen() {
                         </View>
                       </View>
 
-                      {/* Ask AI Button */}
-                      <TouchableOpacity
-                        style={styles.askAiBtn}
-                        onPress={() => handleAskAi(pdf)}
-                        activeOpacity={0.7}
-                      >
-                        <Sparkles size={14} color={theme.colors.primary} />
-                        <Text style={styles.askAiBtnText}>Ask AI</Text>
-                      </TouchableOpacity>
+                      <View style={styles.pdfActions}>
+                        {/* Download PDF Button */}
+                        <TouchableOpacity
+                          style={styles.downloadPdfBtn}
+                          onPress={() => handleDownloadPdf(pdf)}
+                          disabled={downloadingPdfId === pdf.id}
+                          activeOpacity={0.7}
+                        >
+                          {downloadingPdfId === pdf.id ? (
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
+                          ) : (
+                            <Download size={14} color={theme.colors.primary} />
+                          )}
+                          <Text style={styles.downloadPdfBtnText}>
+                            {downloadingPdfId === pdf.id ? 'Saving...' : 'Download'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {/* Ask AI Button */}
+                        <TouchableOpacity
+                          style={styles.askAiBtn}
+                          onPress={() => handleAskAi(pdf)}
+                          activeOpacity={0.7}
+                        >
+                          <Sparkles size={14} color={theme.colors.primary} />
+                          <Text style={styles.askAiBtnText}>Ask AI</Text>
+                        </TouchableOpacity>
+                      </View>
                     </TouchableOpacity>
                   ))
                 )}
@@ -793,11 +827,32 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: theme.colors.textMuted,
   },
+  pdfActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  downloadPdfBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 10,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  downloadPdfBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.textSecondary,
+  },
   askAiBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.primaryLight,
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 10,
     gap: 4,
@@ -805,7 +860,7 @@ const styles = StyleSheet.create({
     borderColor: '#BFDBFE',
   },
   askAiBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: theme.colors.primary,
   },

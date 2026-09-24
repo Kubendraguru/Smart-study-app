@@ -20,12 +20,14 @@ import {
   Link2,
   AlertCircle,
   ExternalLink,
-  Filter,
+  Download,
+  FileText,
 } from 'lucide-react-native';
 import { theme } from '@/theme';
 import AppHeader from '@/components/mobile/AppHeader';
 import { getStudentAssignments } from '@/service/assignments';
 import { useAuth } from '@/context/AuthContext';
+import { downloadPdf } from '@/utils/fileDownloader';
 import type { Assignment } from '@/types';
 
 export default function StudentAssignmentsScreen() {
@@ -35,6 +37,7 @@ export default function StudentAssignmentsScreen() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
 
   const loadData = useCallback(async () => {
@@ -58,6 +61,18 @@ export default function StudentAssignmentsScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     loadData();
+  };
+
+  const handleDownloadAttachment = async (a: Assignment) => {
+    if (!a.attachment_url || downloadingId) return;
+    setDownloadingId(a.id);
+    try {
+      await downloadPdf(a.attachment_url, `${a.title}_assignment`);
+    } catch (err) {
+      Alert.alert('Download Error', 'Could not download assignment attachment.');
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const handleOpenAttachment = async (url?: string | null) => {
@@ -183,17 +198,32 @@ export default function StudentAssignmentsScreen() {
 
               {/* Attachment link if available */}
               {a.attachment_url ? (
-                <TouchableOpacity
-                  style={styles.attachmentBtn}
-                  onPress={() => handleOpenAttachment(a.attachment_url)}
-                  activeOpacity={0.7}
-                >
-                  <Link2 size={14} color="#2563EB" />
-                  <Text style={styles.attachmentBtnText} numberOfLines={1}>
-                    Open Attachment / Reference File
-                  </Text>
-                  <ExternalLink size={12} color="#2563EB" />
-                </TouchableOpacity>
+                <View style={styles.attachmentActionRow}>
+                  <TouchableOpacity
+                    style={styles.attachmentBtn}
+                    onPress={() => handleDownloadAttachment(a)}
+                    disabled={downloadingId === a.id}
+                    activeOpacity={0.7}
+                  >
+                    {downloadingId === a.id ? (
+                      <ActivityIndicator size="small" color="#2563EB" />
+                    ) : (
+                      <Download size={14} color="#2563EB" />
+                    )}
+                    <Text style={styles.attachmentBtnText}>
+                      {downloadingId === a.id ? 'Downloading...' : 'Download PDF / File'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.attachmentOpenBtn}
+                    onPress={() => handleOpenAttachment(a.attachment_url)}
+                    activeOpacity={0.7}
+                  >
+                    <ExternalLink size={14} color="#64748B" />
+                    <Text style={styles.attachmentOpenBtnText}>Open</Text>
+                  </TouchableOpacity>
+                </View>
               ) : null}
 
               <View style={styles.cardFooter}>
@@ -377,6 +407,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 10,
   },
+  attachmentActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
   attachmentBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -385,13 +421,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    marginBottom: 10,
-    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
   },
   attachmentBtnText: {
     fontSize: 12,
     fontWeight: '700',
     color: '#2563EB',
+  },
+  attachmentOpenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.borderLight,
+  },
+  attachmentOpenBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
   },
   cardFooter: {
     flexDirection: 'row',

@@ -9,6 +9,7 @@ import {
   ExternalLink,
   AlertCircle,
   Loader2,
+  Download,
 } from 'lucide-react';
 import PageContainer from '@/components/layout/PageContainer';
 import AppHeader from '@/components/layout/AppHeader';
@@ -16,12 +17,14 @@ import BottomNav from '@/components/layout/BottomNav';
 import Badge from '@/components/ui/Badge';
 import { getStudentAssignments } from '@/service/assignments';
 import { useAuth } from '@/context/AuthContext';
+import { downloadPdf } from '@/utils/fileDownloader';
 import type { Assignment } from '@/types';
 
 export default function StudentAssignmentsScreen() {
   const { user } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
 
   useEffect(() => {
@@ -157,7 +160,29 @@ export default function StudentAssignmentsScreen() {
                   )}
 
                   {a.attachment_url && (
-                    <div className="mb-3">
+                    <div className="flex items-center gap-2 mb-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (downloadingId) return;
+                          setDownloadingId(a.id);
+                          try {
+                            await downloadPdf(a.attachment_url!, `${a.title}_assignment`);
+                          } finally {
+                            setDownloadingId(null);
+                          }
+                        }}
+                        disabled={downloadingId === a.id}
+                        className="inline-flex items-center gap-1.5 text-xs text-white bg-blue-600 px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-75 shadow-xs"
+                      >
+                        {downloadingId === a.id ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Download size={13} />
+                        )}
+                        <span>{downloadingId === a.id ? 'Downloading...' : 'Download PDF / File'}</span>
+                      </button>
+
                       <a
                         href={a.attachment_url}
                         target="_blank"
@@ -165,7 +190,7 @@ export default function StudentAssignmentsScreen() {
                         className="inline-flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-100 transition-colors"
                       >
                         <Link2 size={13} />
-                        View Attached Problem Sheet / Reference
+                        Open File
                         <ExternalLink size={12} />
                       </a>
                     </div>

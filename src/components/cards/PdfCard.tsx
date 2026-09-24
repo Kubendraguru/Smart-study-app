@@ -1,22 +1,23 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Bookmark, Download, Share2 } from 'lucide-react';
+import { FileText, Bookmark, Download, Share2, Loader2 } from 'lucide-react';
 import type { Pdf } from '@/types';
 import IconButton from '@/components/ui/IconButton';
+import { downloadPdf } from '@/utils/fileDownloader';
 
 export default function PdfCard({ pdf, index = 0, onClick }: { pdf: Pdf; index?: number; onClick?: () => void }) {
+  const [downloading, setDownloading] = useState(false);
   const fileUrl = pdf.file_url || pdf.url || '';
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!fileUrl) return;
-    const a = document.createElement('a');
-    a.href = fileUrl;
-    a.download = pdf.title || 'document.pdf';
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    if (!fileUrl || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadPdf(fileUrl, pdf.title);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handleShare = async (e: React.MouseEvent) => {
@@ -64,8 +65,14 @@ export default function PdfCard({ pdf, index = 0, onClick }: { pdf: Pdf; index?:
         <IconButton variant={pdf.bookmarked ? 'active' : 'ghost'} className="flex-1 justify-center">
           <Bookmark size={16} className={pdf.bookmarked ? 'fill-blue-500' : ''} />
         </IconButton>
-        <IconButton variant="ghost" className="flex-1 justify-center" onClick={handleDownload} title="Download PDF">
-          <Download size={16} />
+        <IconButton
+          variant="ghost"
+          className="flex-1 justify-center"
+          onClick={handleDownload}
+          disabled={downloading}
+          title="Download PDF"
+        >
+          {downloading ? <Loader2 size={16} className="animate-spin text-blue-600" /> : <Download size={16} />}
         </IconButton>
         <IconButton variant="ghost" className="flex-1 justify-center" onClick={handleShare} title="Share PDF">
           <Share2 size={16} />
