@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   SafeAreaView,
   StatusBar,
+  Image,
 } from 'react-native';
 import { GraduationCap, Mail, Lock, User, BookOpen, Building, Hash, CheckSquare, Square } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -119,9 +120,13 @@ export default function LoginScreen() {
           {/* Header Banner */}
           <View style={styles.headerBanner}>
             <View style={styles.logoBadge}>
-              <GraduationCap size={36} color={theme.colors.primary} />
+              <Image
+                source={require('../../../assets/icon.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.headerTitle}>Anna University</Text>
+            <Text style={styles.headerTitle}>SRM MCET</Text>
             <Text style={styles.headerSubtitle}>Smart Study Hub</Text>
           </View>
 
@@ -338,17 +343,25 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 36,
   },
   logoBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 6,
+    borderWidth: 2,
+    borderColor: '#FACC15',
+    padding: 3,
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 36,
   },
   headerTitle: {
     fontSize: 22,

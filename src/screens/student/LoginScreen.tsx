@@ -122,18 +122,18 @@ export default function LoginScreen() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <div className="bg-gradient-to-br from-blue-600 to-blue-700 px-6 pt-16 pb-12 rounded-b-[2.5rem]">
+      <div className="bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-800 px-6 pt-12 pb-10 rounded-b-[2.5rem] shadow-lg shadow-blue-700/20">
         <motion.div
-          initial={{ scale: 0, opacity: 0 }}
+          initial={{ scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="flex flex-col items-center"
+          transition={{ type: 'spring', stiffness: 200, damping: 18 }}
+          className="flex flex-col items-center text-center"
         >
-          <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center shadow-lg mb-3">
-            <GraduationCap size={36} className="text-blue-600" />
+          <div className="w-20 h-20 rounded-full bg-white p-1.5 flex items-center justify-center shadow-xl border-2 border-yellow-400/90 mb-3">
+            <img src="/logo.png" alt="SRM MCET Logo" className="w-full h-full object-contain rounded-full" />
           </div>
-          <h1 className="text-xl font-bold text-white">Anna University</h1>
-          <p className="text-blue-100 text-sm">Study Hub</p>
+          <h1 className="text-xl font-black text-white tracking-wide">SRM MCET</h1>
+          <p className="text-blue-100 text-xs font-semibold tracking-wider">Smart Study Hub</p>
         </motion.div>
       </div>
 
