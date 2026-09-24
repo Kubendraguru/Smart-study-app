@@ -67,40 +67,85 @@ export default function UnitDetailsScreen() {
     setLoading(true);
 
     try {
-      // 1. Fetch Unit Info & Completed state in parallel
-      const [unitRes, isDone] = await Promise.all([
-        supabase.from('units').select('*').eq('id', unitId).single(),
-        isUnitCompleted(unitId),
-      ]);
+      const isUuid = (str?: string | null) =>
+        Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
 
-      const unitData = unitRes.data;
+      let resolvedUnitId = unitId;
+      let resolvedTitle = `Unit`;
+      let resolvedNum = 1;
+      let resolvedDesc = '';
 
-      if (unitRes.error || !unitData) {
-        console.error('Error loading unit:', unitRes.error);
-        setUnit(null);
-        return;
+      // Parse unit number from placeholder if present
+      const matchNum = unitId.match(/unit-(\d+)/i);
+      if (matchNum) {
+        resolvedNum = parseInt(matchNum[1], 10);
       }
 
+      if (isUuid(unitId)) {
+        const { data: dbUnit } = await supabase
+          .from('units')
+          .select('*')
+          .eq('id', unitId)
+          .maybeSingle();
+
+        if (dbUnit) {
+          resolvedUnitId = dbUnit.id;
+          resolvedTitle = dbUnit.unit_title ?? dbUnit.title ?? `Unit ${dbUnit.unit_number}`;
+          resolvedNum = dbUnit.unit_number;
+          resolvedDesc = dbUnit.description ?? '';
+        }
+      } else if (subjectId) {
+        // Try resolving by subjectId and unit number
+        const { data: dbUnit } = await supabase
+          .from('units')
+          .select('*')
+          .eq('subject_id', subjectId)
+          .eq('unit_number', resolvedNum)
+          .maybeSingle();
+
+        if (dbUnit) {
+          resolvedUnitId = dbUnit.id;
+          resolvedTitle = dbUnit.unit_title ?? dbUnit.title ?? `Unit ${dbUnit.unit_number}`;
+          resolvedNum = dbUnit.unit_number;
+          resolvedDesc = dbUnit.description ?? '';
+        } else {
+          resolvedTitle = `Unit ${resolvedNum}: Syllabus Topics & Notes`;
+          resolvedDesc = `Curriculum materials, lecture notes, and assignments will appear here once uploaded by your instructor.`;
+        }
+      }
+
+      const isDone = await isUnitCompleted(resolvedUnitId);
+
       setUnit({
-        id: unitData.id,
-        subject_id: unitData.subject_id,
-        unit_number: unitData.unit_number,
-        title: unitData.unit_title ?? unitData.title ?? `Unit ${unitData.unit_number}`,
-        description: unitData.description ?? '',
+        id: resolvedUnitId,
+        subject_id: subjectId,
+        unit_number: resolvedNum,
+        title: resolvedTitle,
+        description: resolvedDesc,
         completed: isDone,
       });
 
       // 2. Fetch PDFs from materials
-      const { data: materialsData } = await supabase
-        .from('materials')
-        .select('*')
-        .eq('unit_id', unitId)
-        .or('material_type.ilike.pdf,file_url.ilike.%.pdf')
-        .order('created_at', { ascending: false });
+      const materialsPromise = isUuid(resolvedUnitId)
+        ? supabase
+            .from('materials')
+            .select('*')
+            .eq('unit_id', resolvedUnitId)
+            .or('material_type.ilike.pdf,file_url.ilike.%.pdf')
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] });
 
-      const formattedPdfs = (materialsData ?? []).map((m: any) => ({
+      // 3. Fetch Single Videos & Playlists, Assignments, and Books
+      const [materialsRes, allVids, assigns, bks] = await Promise.all([
+        materialsPromise,
+        getVideos(subjectId, isUuid(resolvedUnitId) ? resolvedUnitId : undefined),
+        getAssignments({ subjectId, unitId: isUuid(resolvedUnitId) ? resolvedUnitId : undefined }),
+        getBooks(subjectId, isUuid(resolvedUnitId) ? resolvedUnitId : undefined),
+      ]);
+
+      const formattedPdfs = (materialsRes.data ?? []).map((m: any) => ({
         id: m.id,
-        title: m.title,
+        title: m.title || 'PDF Material',
         size: 'PDF',
         pages: 1,
         uploadedBy: 'Instructor',
@@ -111,20 +156,13 @@ export default function UnitDetailsScreen() {
       }));
       setPdfs(formattedPdfs);
 
-      // 3. Fetch Single Videos & Playlists, Assignments, and Books
-      const [allVids, assigns, bks] = await Promise.all([
-        getVideos(subjectId, unitId),
-        getAssignments({ subjectId, unitId }),
-        getBooks(subjectId, unitId),
-      ]);
-
-      const singleVideos = allVids.filter((v) => !v.is_playlist && v.video_type !== 'playlist');
-      const playlistVideos = allVids.filter((v) => v.is_playlist || v.video_type === 'playlist');
+      const singleVideos = (allVids || []).filter((v) => !v.is_playlist && v.video_type !== 'playlist');
+      const playlistVideos = (allVids || []).filter((v) => v.is_playlist || v.video_type === 'playlist');
 
       setVideos(singleVideos);
       setPlaylists(playlistVideos);
-      setAssignments(assigns);
-      setBooks(bks);
+      setAssignments(assigns || []);
+      setBooks(bks || []);
     } catch (error) {
       console.error('Unexpected error loading unit:', error);
       setUnit(null);

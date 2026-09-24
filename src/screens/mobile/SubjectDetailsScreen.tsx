@@ -9,7 +9,7 @@ import {
   SafeAreaView,
   RefreshControl,
 } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import {
   BookOpen,
   FileText,
@@ -114,15 +114,49 @@ export default function SubjectDetailsScreen() {
         });
       }
 
-      const formattedUnits: UnitItem[] = (unitsList ?? []).map((u) => ({
-        id: u.id,
-        unit_number: u.unit_number,
-        unit_title: u.unit_title || `Unit ${u.unit_number}`,
-        description: u.description || '',
-        pdfCount: pdfMap[u.id] || 0,
-        videoCount: videoMap[u.id] || 0,
-        bookCount: bookMap[u.id] || 0,
-      }));
+      // 4. Build comprehensive 5-unit curriculum list (seamlessly showing teacher units & placeholders)
+      const rawUnits = unitsList ?? [];
+      const formattedUnits: UnitItem[] = [];
+
+      for (let uNum = 1; uNum <= 5; uNum++) {
+        const existing = rawUnits.find((u) => u.unit_number === uNum);
+        if (existing) {
+          formattedUnits.push({
+            id: existing.id,
+            unit_number: existing.unit_number,
+            unit_title: existing.unit_title || `Unit ${existing.unit_number}`,
+            description: existing.description || '',
+            pdfCount: pdfMap[existing.id] || 0,
+            videoCount: videoMap[existing.id] || 0,
+            bookCount: bookMap[existing.id] || 0,
+          });
+        } else {
+          formattedUnits.push({
+            id: `${subjectId}-unit-${uNum}`,
+            unit_number: uNum,
+            unit_title: `Unit ${uNum}: Syllabus Topics & Notes`,
+            description: `Curriculum materials, lecture notes, and question bank for Unit ${uNum}.`,
+            pdfCount: 0,
+            videoCount: 0,
+            bookCount: 0,
+          });
+        }
+      }
+
+      // Also include any extra units uploaded by teacher (e.g. Unit 6+)
+      rawUnits.forEach((u) => {
+        if (u.unit_number > 5) {
+          formattedUnits.push({
+            id: u.id,
+            unit_number: u.unit_number,
+            unit_title: u.unit_title || `Unit ${u.unit_number}`,
+            description: u.description || '',
+            pdfCount: pdfMap[u.id] || 0,
+            videoCount: videoMap[u.id] || 0,
+            bookCount: bookMap[u.id] || 0,
+          });
+        }
+      });
 
       setUnits(formattedUnits);
     } catch (err) {
@@ -133,9 +167,11 @@ export default function SubjectDetailsScreen() {
     }
   }, [subjectId]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

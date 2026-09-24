@@ -16,13 +16,19 @@ export async function getAssignments(options?: {
       `)
       .order('due_date', { ascending: true });
 
+    const isUuid = (str?: string | null) =>
+      Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
     if (options?.subjectId) {
+      if (!isUuid(options.subjectId)) return [];
       query = query.eq('subject_id', options.subjectId);
     }
     if (options?.unitId) {
+      if (!isUuid(options.unitId)) return [];
       query = query.eq('unit_id', options.unitId);
     }
     if (options?.teacherId) {
+      if (!isUuid(options.teacherId)) return [];
       query = query.eq('teacher_id', options.teacherId);
     }
 

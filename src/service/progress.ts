@@ -361,7 +361,10 @@ export async function getStudentOverallProgress(studentId?: string): Promise<Stu
           description = `Curriculum materials, lecture notes, and question bank for Unit ${uNum}.`;
         }
 
-        const isDone = completedUnitSet.has(unitId);
+        const isDone =
+          completedUnitSet.has(unitId) ||
+          completedUnitSet.has(`${subj.id}-unit-${uNum}`);
+
         if (isDone) completedUnits += 1;
 
         unitProgressItems.push({
@@ -373,7 +376,23 @@ export async function getStudentOverallProgress(studentId?: string): Promise<Stu
         });
       }
 
-      const totalUnits = 5;
+      // Include extra teacher units if unit_number > 5
+      rawUnits.forEach((u: any) => {
+        if (u.unit_number > 5) {
+          const isDone = completedUnitSet.has(u.id);
+          if (isDone) completedUnits += 1;
+
+          unitProgressItems.push({
+            id: u.id,
+            unitNumber: u.unit_number,
+            title: u.unit_title || u.title || `Unit ${u.unit_number}`,
+            description: u.description || null,
+            completed: isDone,
+          });
+        }
+      });
+
+      const totalUnits = unitProgressItems.length || 5;
       const remainingUnits = Math.max(0, totalUnits - completedUnits);
       const percentage = Math.round((completedUnits / totalUnits) * 100);
 
@@ -520,14 +539,19 @@ export async function getTeacherCohortProgress(subjectId: string): Promise<Teach
     const enrolledStudents = Array.from(studentsMap.values());
     const studentIds = enrolledStudents.map((s) => s.id);
 
+    const isUuid = (str?: string | null) =>
+      Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
+    const validDbUnitIds = unitIds.filter(isUuid);
+
     // 4. Fetch all student_unit_progress records for these students and these units
     let progressRecords: any[] = [];
-    if (studentIds.length > 0 && unitIds.length > 0) {
+    if (studentIds.length > 0 && validDbUnitIds.length > 0) {
       const { data: progData } = await supabase
         .from('student_unit_progress')
         .select('student_id, unit_id, completed, completed_at')
         .in('student_id', studentIds)
-        .in('unit_id', unitIds)
+        .in('unit_id', validDbUnitIds)
         .eq('completed', true);
 
       progressRecords = progData || [];

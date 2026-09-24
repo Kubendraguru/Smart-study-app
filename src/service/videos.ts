@@ -34,10 +34,21 @@ export async function getVideos(
       .select('*')
       .order('created_at', { ascending: false });
 
+    const isUuid = (str?: string | null) =>
+      Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
     if (subjectId) {
+      if (!isUuid(subjectId)) {
+        // Not a UUID, return fallback
+        return [];
+      }
       query = query.eq('subject_id', subjectId);
     }
     if (unitId) {
+      if (!isUuid(unitId)) {
+        // Not a UUID (e.g. placeholder unit), return empty
+        return [];
+      }
       query = query.eq('unit_id', unitId);
     }
     if (options?.isPlaylist !== undefined) {

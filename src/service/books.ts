@@ -8,10 +8,15 @@ export async function getBooks(subjectId?: string, unitId?: string): Promise<Boo
       .select('*')
       .order('created_at', { ascending: false });
 
+    const isUuid = (str?: string | null) =>
+      Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
     if (subjectId) {
+      if (!isUuid(subjectId)) return [];
       query = query.eq('subject_id', subjectId);
     }
     if (unitId) {
+      if (!isUuid(unitId)) return [];
       query = query.eq('unit_id', unitId);
     }
 

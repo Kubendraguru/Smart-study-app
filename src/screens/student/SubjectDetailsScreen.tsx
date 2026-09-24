@@ -21,6 +21,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useArrearMotivation } from '@/hooks/useArrearMotivation';
 import ArrearMotivationToast from '@/components/arrear/ArrearMotivationToast';
+import { getCompletedUnitIds } from '@/service/progress';
 
 type SupabaseSubject = {
   id: string;
@@ -212,6 +213,73 @@ export default function SubjectDetailsScreen() {
         }
       }
 
+      // Fetch student's completed unit IDs
+      const completedUnitSet = await getCompletedUnitIds(user.id);
+
+      // Build 5 full curriculum units
+      const rawUnits = unitData ?? [];
+      const formattedUnitsList: any[] = [];
+      let completedCount = 0;
+
+      for (let uNum = 1; uNum <= 5; uNum++) {
+        const existing = rawUnits.find((u: any) => u.unit_number === uNum);
+        if (existing) {
+          const isDone = completedUnitSet.has(existing.id);
+          if (isDone) completedCount += 1;
+
+          formattedUnitsList.push({
+            id: existing.id,
+            number: existing.unit_number,
+            title: existing.unit_title ?? existing.title ?? `Unit ${existing.unit_number}`,
+            description: existing.description ?? '',
+            pdfs: materialsByUnit[existing.id] ?? [],
+            videos: [],
+            importantQuestions: [],
+            assignments: [],
+            completed: isDone,
+          });
+        } else {
+          const placeholderId = `${subjectId}-unit-${uNum}`;
+          const isDone = completedUnitSet.has(placeholderId);
+          if (isDone) completedCount += 1;
+
+          formattedUnitsList.push({
+            id: placeholderId,
+            number: uNum,
+            title: `Unit ${uNum}: Syllabus Topics & Notes`,
+            description: `Curriculum materials, lecture notes, and question bank for Unit ${uNum}.`,
+            pdfs: [],
+            videos: [],
+            importantQuestions: [],
+            assignments: [],
+            completed: isDone,
+          });
+        }
+      }
+
+      // Append extra units if teacher added >5
+      rawUnits.forEach((u: any) => {
+        if (u.unit_number > 5) {
+          const isDone = completedUnitSet.has(u.id);
+          if (isDone) completedCount += 1;
+
+          formattedUnitsList.push({
+            id: u.id,
+            number: u.unit_number,
+            title: u.unit_title ?? u.title ?? `Unit ${u.unit_number}`,
+            description: u.description ?? '',
+            pdfs: materialsByUnit[u.id] ?? [],
+            videos: [],
+            importantQuestions: [],
+            assignments: [],
+            completed: isDone,
+          });
+        }
+      });
+
+      const totalUnits = formattedUnitsList.length || 5;
+      const progressPercentage = Math.round((completedCount / totalUnits) * 100);
+
       const formattedSubject: Subject = {
         id: dbSubject.id,
         code: dbSubject.subject_code,
@@ -221,18 +289,8 @@ export default function SubjectDetailsScreen() {
         description: dbSubject.description ?? '',
         color: isArrear ? 'rose' : 'blue',
         icon: 'book-open',
-        progress: 0,
-        units: (unitData ?? []).map((unit: any) => ({
-          id: unit.id,
-          number: unit.unit_number,
-          title: unit.unit_title ?? unit.title ?? `Unit ${unit.unit_number}`,
-          description: unit.description ?? '',
-          pdfs: materialsByUnit[unit.id] ?? [],
-          videos: [],
-          importantQuestions: [],
-          assignments: [],
-          completed: false,
-        })),
+        progress: progressPercentage,
+        units: formattedUnitsList,
         isArrear,
       };
 

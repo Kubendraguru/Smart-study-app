@@ -11,7 +11,7 @@ import {
   Linking,
   RefreshControl,
 } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import {
   FileText,
   Sparkles,
@@ -54,7 +54,10 @@ export default function UnitDetailsScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
 
-  const { unitId, unitTitle, unitNumber, subjectId, subjectName } = route.params || {};
+  const [currentUnitId, setCurrentUnitId] = useState<string>(unitId || '');
+  const [currentUnitTitle, setCurrentUnitTitle] = useState<string>(unitTitle || `Unit ${unitNumber || ''}`);
+  const [currentUnitNumber, setCurrentUnitNumber] = useState<number>(Number(unitNumber) || 1);
+  const [unitDescription, setUnitDescription] = useState<string>('');
 
   const [activeTab, setActiveTab] = useState<TabType>('pdfs');
   const [loading, setLoading] = useState(true);
@@ -75,28 +78,73 @@ export default function UnitDetailsScreen() {
   const [books, setBooks] = useState<Book[]>([]);
 
   const loadUnitContent = useCallback(async () => {
-    if (!unitId) return;
+    if (!subjectId && !unitId) return;
     setLoading(true);
 
     try {
-      // 1. Check if unit is marked completed
-      const completedStatusPromise = isUnitCompleted(unitId);
+      const isUuid = (str?: string | null) =>
+        Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
 
-      // 2. Fetch PDFs from materials
-      const materialsPromise = supabase
-        .from('materials')
-        .select('*')
-        .eq('unit_id', unitId)
-        .or('material_type.ilike.pdf,file_url.ilike.%.pdf')
-        .order('created_at', { ascending: false });
+      let resolvedUnitId = unitId || '';
+      let resolvedTitle = unitTitle || `Unit ${unitNumber || ''}`;
+      let resolvedNum = Number(unitNumber) || 1;
+      let resolvedDesc = '';
 
-      // 3. Fetch Single Videos & Playlists & Assignments & Books
+      // 1. Check if unit exists in DB by ID or by subjectId + unitNumber
+      if (isUuid(unitId)) {
+        const { data: dbUnit } = await supabase
+          .from('units')
+          .select('*')
+          .eq('id', unitId)
+          .maybeSingle();
+
+        if (dbUnit) {
+          resolvedUnitId = dbUnit.id;
+          resolvedTitle = dbUnit.unit_title || `Unit ${dbUnit.unit_number}`;
+          resolvedNum = dbUnit.unit_number;
+          resolvedDesc = dbUnit.description || '';
+        }
+      } else if (subjectId && unitNumber) {
+        const { data: dbUnit } = await supabase
+          .from('units')
+          .select('*')
+          .eq('subject_id', subjectId)
+          .eq('unit_number', Number(unitNumber))
+          .maybeSingle();
+
+        if (dbUnit) {
+          resolvedUnitId = dbUnit.id;
+          resolvedTitle = dbUnit.unit_title || `Unit ${dbUnit.unit_number}`;
+          resolvedNum = dbUnit.unit_number;
+          resolvedDesc = dbUnit.description || '';
+        }
+      }
+
+      setCurrentUnitId(resolvedUnitId);
+      setCurrentUnitTitle(resolvedTitle);
+      setCurrentUnitNumber(resolvedNum);
+      setUnitDescription(resolvedDesc);
+
+      // 2. Check if unit is marked completed
+      const completedStatusPromise = isUnitCompleted(resolvedUnitId || unitId);
+
+      // 3. Fetch PDFs from materials
+      const materialsPromise = isUuid(resolvedUnitId)
+        ? supabase
+            .from('materials')
+            .select('*')
+            .eq('unit_id', resolvedUnitId)
+            .or('material_type.ilike.pdf,file_url.ilike.%.pdf')
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] });
+
+      // 4. Fetch Single Videos & Playlists & Assignments & Books
       const [completedStatus, materialsRes, allVids, assigns, bks] = await Promise.all([
         completedStatusPromise,
         materialsPromise,
-        getVideos(subjectId, unitId),
-        getAssignments({ subjectId, unitId }),
-        getBooks(subjectId, unitId),
+        getVideos(subjectId, isUuid(resolvedUnitId) ? resolvedUnitId : undefined),
+        getAssignments({ subjectId, unitId: isUuid(resolvedUnitId) ? resolvedUnitId : undefined }),
+        getBooks(subjectId, isUuid(resolvedUnitId) ? resolvedUnitId : undefined),
       ]);
 
       setIsCompleted(completedStatus);
@@ -110,27 +158,28 @@ export default function UnitDetailsScreen() {
       }));
       setPdfs(formattedPdfs);
 
-      const singleVideos = allVids.filter((v) => !v.is_playlist && v.video_type !== 'playlist');
-      const playlistVideos = allVids.filter((v) => v.is_playlist || v.video_type === 'playlist');
+      const singleVideos = (allVids || []).filter((v) => !v.is_playlist && v.video_type !== 'playlist');
+      const playlistVideos = (allVids || []).filter((v) => v.is_playlist || v.video_type === 'playlist');
 
       setVideos(singleVideos);
       setPlaylists(playlistVideos);
-      setAssignments(assigns);
-      setBooks(bks);
+      setAssignments(assigns || []);
+      setBooks(bks || []);
     } catch (err) {
       console.error('Error fetching unit materials:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [unitId, subjectId]);
+  }, [unitId, unitTitle, unitNumber, subjectId]);
 
   const handleToggleCompletion = async () => {
-    if (!unitId || togglingCompletion) return;
+    const targetId = currentUnitId || unitId;
+    if (!targetId || togglingCompletion) return;
     const nextState = !isCompleted;
     setIsCompleted(nextState); // Optimistic UI update
     setTogglingCompletion(true);
-    const res = await toggleUnitCompletion(unitId, nextState);
+    const res = await toggleUnitCompletion(targetId, nextState);
     if (!res.success) {
       // Revert if error
       setIsCompleted(!nextState);
@@ -138,9 +187,11 @@ export default function UnitDetailsScreen() {
     setTogglingCompletion(false);
   };
 
-  useEffect(() => {
-    loadUnitContent();
-  }, [loadUnitContent]);
+  useFocusEffect(
+    useCallback(() => {
+      loadUnitContent();
+    }, [loadUnitContent])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -184,7 +235,7 @@ export default function UnitDetailsScreen() {
           <View style={styles.unitHeaderTopRow}>
             <View style={styles.badgeRow}>
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>Unit {unitNumber}</Text>
+                <Text style={styles.badgeText}>Unit {currentUnitNumber}</Text>
               </View>
               <Text style={styles.subjectSubText}>{subjectName}</Text>
             </View>
@@ -212,7 +263,10 @@ export default function UnitDetailsScreen() {
               )}
             </TouchableOpacity>
           </View>
-          <Text style={styles.unitTitleText}>{unitTitle}</Text>
+          <Text style={styles.unitTitleText}>{currentUnitTitle}</Text>
+          {unitDescription ? (
+            <Text style={styles.unitDescriptionText}>{unitDescription}</Text>
+          ) : null}
         </View>
 
         {/* 5-Resource Tab Navigation */}
@@ -623,6 +677,12 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     color: theme.colors.text,
+  },
+  unitDescriptionText: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
+    marginTop: 6,
   },
   tabBarScroll: {
     marginBottom: 16,
