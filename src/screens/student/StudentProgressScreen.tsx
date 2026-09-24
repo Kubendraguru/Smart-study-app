@@ -38,7 +38,11 @@ export default function StudentProgressScreen() {
       if (data.subjects.length > 0) {
         setExpandedSubjects((prev) => {
           if (Object.keys(prev).length === 0) {
-            return { [data.subjects[0].subjectId]: true };
+            const allExpanded: Record<string, boolean> = {};
+            data.subjects.forEach((s) => {
+              allExpanded[s.subjectId] = true;
+            });
+            return allExpanded;
           }
           return prev;
         });
@@ -59,6 +63,15 @@ export default function StudentProgressScreen() {
       ...prev,
       [subjectId]: !prev[subjectId],
     }));
+  };
+
+  const toggleAllExpand = () => {
+    const areAllExpanded = progressData?.subjects.every((s) => expandedSubjects[s.subjectId]);
+    const newState: Record<string, boolean> = {};
+    progressData?.subjects.forEach((s) => {
+      newState[s.subjectId] = !areAllExpanded;
+    });
+    setExpandedSubjects(newState);
   };
 
   const handleToggleUnit = async (subjectId: string, unitId: string, currentCompleted: boolean) => {
@@ -208,8 +221,18 @@ export default function StudentProgressScreen() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-base font-bold text-gray-900">Subject Breakdown & Unit Checklist</h2>
-                    <p className="text-xs text-gray-500">Click a subject to toggle units or mark them completed</p>
+                    <p className="text-xs text-gray-500">Check off completed units to update your curriculum progress</p>
                   </div>
+                  {progressData && progressData.subjects.length > 0 && (
+                    <button
+                      onClick={toggleAllExpand}
+                      className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all border border-blue-200 shadow-sm"
+                    >
+                      {progressData.subjects.every((s) => expandedSubjects[s.subjectId])
+                        ? 'Collapse All'
+                        : 'Expand All'}
+                    </button>
+                  )}
                 </div>
 
                 {(!progressData || progressData.subjects.length === 0) ? (

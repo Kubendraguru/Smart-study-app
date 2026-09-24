@@ -48,11 +48,15 @@ export default function StudentProgressScreen() {
     try {
       const data = await getStudentOverallProgress();
       setProgressData(data);
-      // Automatically expand the first subject by default
+      // Automatically expand all subjects by default so units are immediately visible
       if (data.subjects.length > 0) {
         setExpandedSubjects((prev) => {
           if (Object.keys(prev).length === 0) {
-            return { [data.subjects[0].subjectId]: true };
+            const allExpanded: Record<string, boolean> = {};
+            data.subjects.forEach((s) => {
+              allExpanded[s.subjectId] = true;
+            });
+            return allExpanded;
           }
           return prev;
         });
@@ -80,6 +84,16 @@ export default function StudentProgressScreen() {
       ...prev,
       [subjectId]: !prev[subjectId],
     }));
+  };
+
+  const toggleAllExpand = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const areAllExpanded = progressData?.subjects.every((s) => expandedSubjects[s.subjectId]);
+    const newState: Record<string, boolean> = {};
+    progressData?.subjects.forEach((s) => {
+      newState[s.subjectId] = !areAllExpanded;
+    });
+    setExpandedSubjects(newState);
   };
 
   const handleToggleUnit = async (subjectId: string, unitId: string, currentCompleted: boolean) => {
@@ -231,10 +245,25 @@ export default function StudentProgressScreen() {
 
             {/* Subject-Wise Breakdown Section Header */}
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Subject Progress & Unit Checklist</Text>
-              <Text style={styles.sectionSubtitle}>
-                Tap any subject to view units and mark them completed
-              </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionTitle}>Subject Progress & Unit Checklist</Text>
+                <Text style={styles.sectionSubtitle}>
+                  Check off completed units to update your progress
+                </Text>
+              </View>
+              {progressData && progressData.subjects.length > 0 && (
+                <TouchableOpacity
+                  style={styles.expandAllBtn}
+                  onPress={toggleAllExpand}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.expandAllBtnText}>
+                    {progressData.subjects.every((s) => expandedSubjects[s.subjectId])
+                      ? 'Collapse All'
+                      : 'Expand All'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Subjects List */}
@@ -511,6 +540,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 14,
   },
   sectionTitle: {
@@ -522,6 +554,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.textSecondary,
     marginTop: 2,
+  },
+  expandAllBtn: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  expandAllBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2563EB',
   },
   subjectCard: {
     backgroundColor: '#FFFFFF',
