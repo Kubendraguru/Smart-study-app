@@ -54,6 +54,8 @@ export default function UnitDetailsScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
 
+  const { unitId, unitTitle, unitNumber, subjectId, subjectName } = route.params || {};
+
   const [currentUnitId, setCurrentUnitId] = useState<string>(unitId || '');
   const [currentUnitTitle, setCurrentUnitTitle] = useState<string>(unitTitle || `Unit ${unitNumber || ''}`);
   const [currentUnitNumber, setCurrentUnitNumber] = useState<number>(Number(unitNumber) || 1);
